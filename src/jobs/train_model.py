@@ -13,7 +13,7 @@ from sklearn.model_selection import train_test_split
 
 from src.common.config import AppConfig
 from src.common.contracts import FEATURE_COLUMNS, GOLD_EXPORT_PREFIX, MODEL_EXPORT_URI, MODEL_NAME
-from src.common.io import get_s3_client, upload_file
+from src.common.io import get_s3_client
 from src.common.logging_utils import configure_logging
 from src.common.modeling import export_model_metadata, save_model_local
 
@@ -66,7 +66,15 @@ def main() -> None:
             export_prefix = "serving/current"
             client = get_s3_client(config)
             client.upload_file(str(model_path), bucket, f"{export_prefix}/model.joblib")
-            export_model_metadata(model, MODEL_EXPORT_URI.rstrip("/"))
+            export_model_metadata(
+                model,
+                MODEL_EXPORT_URI.rstrip("/"),
+                {
+                    "run_id": run.info.run_id,
+                    "model_name": MODEL_NAME,
+                    "artifact_uri": run.info.artifact_uri,
+                },
+            )
 
         mlflow.set_tag("model_name", MODEL_NAME)
         print(f"run_id={run.info.run_id}")
