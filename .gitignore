@@ -25,9 +25,10 @@ logs/
 
 # Docker / local volumes / generated state
 volumes/
-data/
+data/local/
 tmp/
 *.pid
+checkpoints/
 
 # Airflow
 src/airflow/logs/
@@ -41,9 +42,13 @@ models/
 metastore_db/
 spark-warehouse/
 target/
+.pytest_cache/
+
+# Local generated outputs
+dist/
+reports/
 
 # Terraform if added later
 .terraform/
 *.tfstate
 *.tfstate.*
-

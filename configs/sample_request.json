@@ -1,0 +1,20 @@
+{
+  "airport_code": "ATL",
+  "event_time": "2024-01-01T08:00:00Z",
+  "temperature_c": 12.5,
+  "wind_speed_kts": 9.4,
+  "visibility_miles": 8.0,
+  "precip_mm": 0.0,
+  "pressure_hpa": 1014.2,
+  "dep_count": 112,
+  "arr_count": 109,
+  "avg_dep_delay_min": 11.5,
+  "avg_arr_delay_min": 9.8,
+  "event_hour": 8,
+  "is_weekend": 0,
+  "rolling_avg_dep_delay_6h": 10.2,
+  "rolling_avg_arr_delay_6h": 9.3,
+  "rolling_max_wind_6h": 14.0,
+  "rolling_total_precip_6h": 0.4,
+  "delay_pressure_index": 0.104
+}

@@ -20,6 +20,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    ports:
+      - "127.0.0.1:5432:5432"
     networks: [bdp]
 
   minio:
@@ -30,6 +32,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     ports:
       - "127.0.0.1:9000:9000"
       - "127.0.0.1:9001:9001"
@@ -56,64 +59,86 @@ services:
     networks: [bdp]
 
   kafka:
-    image: bitnami/kafka:latest
+    image: confluentinc/cp-kafka:7.7.1
     container_name: bdp-kafka
     restart: unless-stopped
     environment:
-      KAFKA_ENABLE_KRAFT: "yes"
-      KAFKA_CFG_NODE_ID: "1"
-      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
-      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
-      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
-      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: "1"
-      KAFKA_CFG_NUM_PARTITIONS: "3"
-      KAFKA_CFG_LOG_RETENTION_HOURS: "24"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_NUM_PARTITIONS: "3"
+      KAFKA_LOG_RETENTION_HOURS: "24"
+      KAFKA_LOG_SEGMENT_BYTES: "134217728"
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"
-      ALLOW_PLAINTEXT_LISTENER: "yes"
     ports:
       - "127.0.0.1:9092:9092"
     volumes:
-      - ./volumes/kafka:/bitnami/kafka
+      - ./volumes/kafka:/var/lib/kafka/data
     networks: [bdp]
 
   spark-master:
-    image: bitnami/spark:3.5
+    build:
+      context: ./docker/spark
+      args:
+        SPARK_BASE_IMAGE: apache/spark:3.5.1-java17-python3
+        DELTA_VERSION: 3.1.0
+        HADOOP_AWS_VERSION: 3.3.4
+        AWS_SDK_BUNDLE_VERSION: 1.12.262
     container_name: bdp-spark-master
     restart: unless-stopped
     environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       SPARK_MODE: master
       SPARK_MASTER_HOST: spark-master
       SPARK_MASTER_PORT_NUMBER: "7077"
       SPARK_MASTER_WEBUI_PORT_NUMBER: "8080"
+      SPARK_DAEMON_MEMORY: 1g
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - ./src:/workspace/src
+      - ./:/workspace
       - ./volumes/spark-events:/tmp/spark-events
     networks: [bdp]
 
   spark-worker:
-    image: bitnami/spark:3.5
+    build:
+      context: ./docker/spark
+      args:
+        SPARK_BASE_IMAGE: apache/spark:3.5.1-java17-python3
+        DELTA_VERSION: 3.1.0
+        HADOOP_AWS_VERSION: 3.3.4
+        AWS_SDK_BUNDLE_VERSION: 1.12.262
     container_name: bdp-spark-worker
     restart: unless-stopped
     depends_on:
       - spark-master
     environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077
       SPARK_WORKER_MEMORY: 4G
       SPARK_WORKER_CORES: "2"
       SPARK_WORKER_WEBUI_PORT_NUMBER: "8081"
+      SPARK_DAEMON_MEMORY: 1g
     ports:
       - "127.0.0.1:8081:8081"
     volumes:
-      - ./src:/workspace/src
+      - ./:/workspace
       - ./volumes/spark-events:/tmp/spark-events
     networks: [bdp]
 
@@ -140,7 +165,7 @@ services:
     ports:
       - "127.0.0.1:5000:5000"
     volumes:
-      - ./src:/workspace/src
+      - ./:/workspace
     networks: [bdp]
 
   devbox:
@@ -153,11 +178,15 @@ services:
     command: sleep infinity
     volumes:
       - ./:/workspace
+      - ./volumes/bentoml:/root/bentoml
     working_dir: /workspace
     environment:
+      APP_ENV: dev
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_EXPORT_URI: s3://mlflow/serving/current/
       PYTHONUNBUFFERED: "1"
     depends_on:
       - kafka
@@ -177,6 +206,8 @@ services:
       - "127.0.0.1:9090:9090"
     volumes:
       - ./compose/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - minio
     networks: [bdp]
 
   grafana:
@@ -184,6 +215,7 @@ services:
     container_name: bdp-grafana
     profiles: ["monitoring"]
     restart: unless-stopped
+    user: "0:0"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
@@ -191,12 +223,16 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - ./volumes/grafana:/var/lib/grafana
+      - ./compose/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./compose/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
     networks: [bdp]
 
   airflow-init:
-    image: apache/airflow:2.10.5-python3.11
+    build:
+      context: ./docker/airflow
     container_name: bdp-airflow-init
     profiles: ["airflow"]
     depends_on:
@@ -208,13 +244,18 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      COMPOSE_PROJECT_NAME: big-data-project
+      HOST_PROJECT_DIR: /home/guggella-chaitanya-reddy/big-data-project
       TZ: ${TZ}
-    user: "${AIRFLOW_UID}:0"
+    user: "0:0"
     volumes:
       - ./src/airflow/dags:/opt/airflow/dags
       - ./src/airflow/logs:/opt/airflow/logs
       - ./src/airflow/plugins:/opt/airflow/plugins
       - ./src/airflow/config:/opt/airflow/config
+      - ./:/opt/airflow/app
+      - ./:/home/guggella-chaitanya-reddy/big-data-project
+      - /var/run/docker.sock:/var/run/docker.sock
     entrypoint: /bin/bash
     command: >
       -c "
@@ -230,14 +271,16 @@ services:
     networks: [bdp]
 
   airflow-webserver:
-    image: apache/airflow:2.10.5-python3.11
+    build:
+      context: ./docker/airflow
     container_name: bdp-airflow-web
     profiles: ["airflow"]
     restart: unless-stopped
     depends_on:
-      - airflow-init
+      airflow-init:
+        condition: service_completed_successfully
     environment: *airflow-env
-    user: "${AIRFLOW_UID}:0"
+    user: "0:0"
     command: airflow webserver
     ports:
       - "127.0.0.1:8088:8080"
@@ -246,23 +289,31 @@ services:
       - ./src/airflow/logs:/opt/airflow/logs
       - ./src/airflow/plugins:/opt/airflow/plugins
       - ./src/airflow/config:/opt/airflow/config
+      - ./:/opt/airflow/app
+      - ./:/home/guggella-chaitanya-reddy/big-data-project
+      - /var/run/docker.sock:/var/run/docker.sock
     networks: [bdp]
 
   airflow-scheduler:
-    image: apache/airflow:2.10.5-python3.11
+    build:
+      context: ./docker/airflow
     container_name: bdp-airflow-scheduler
     profiles: ["airflow"]
     restart: unless-stopped
     depends_on:
-      - airflow-init
+      airflow-init:
+        condition: service_completed_successfully
     environment: *airflow-env
-    user: "${AIRFLOW_UID}:0"
+    user: "0:0"
     command: airflow scheduler
     volumes:
       - ./src/airflow/dags:/opt/airflow/dags
       - ./src/airflow/logs:/opt/airflow/logs
       - ./src/airflow/plugins:/opt/airflow/plugins
       - ./src/airflow/config:/opt/airflow/config
+      - ./:/opt/airflow/app
+      - ./:/home/guggella-chaitanya-reddy/big-data-project
+      - /var/run/docker.sock:/var/run/docker.sock
     networks: [bdp]
 
 networks:
