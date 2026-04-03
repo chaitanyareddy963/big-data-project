@@ -1,0 +1,270 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: bdp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      AIRFLOW_DB: ${AIRFLOW_DB}
+      AIRFLOW_DB_USER: ${AIRFLOW_DB_USER}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      MLFLOW_DB: ${MLFLOW_DB}
+      MLFLOW_DB_USER: ${MLFLOW_DB_USER}
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD}
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+      - ./compose/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [bdp]
+
+  minio:
+    image: minio/minio:latest
+    container_name: bdp-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - ./volumes/minio:/data
+    networks: [bdp]
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: bdp-minio-init
+    depends_on:
+      - minio
+    entrypoint: /bin/sh
+    command: >
+      -c '
+      until mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; do sleep 2; done;
+      mc mb -p local/raw || true;
+      mc mb -p local/bronze || true;
+      mc mb -p local/silver || true;
+      mc mb -p local/gold || true;
+      mc mb -p local/mlflow || true;
+      exit 0;
+      '
+    networks: [bdp]
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: bdp-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_CFG_NODE_ID: "1"
+      KAFKA_CFG_PROCESS_ROLES: "broker,controller"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_CFG_NUM_PARTITIONS: "3"
+      KAFKA_CFG_LOG_RETENTION_HOURS: "24"
+      KAFKA_HEAP_OPTS: "-Xms512m -Xmx512m"
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+    ports:
+      - "127.0.0.1:9092:9092"
+    volumes:
+      - ./volumes/kafka:/bitnami/kafka
+    networks: [bdp]
+
+  spark-master:
+    image: bitnami/spark:3.5
+    container_name: bdp-spark-master
+    restart: unless-stopped
+    environment:
+      SPARK_MODE: master
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT_NUMBER: "7077"
+      SPARK_MASTER_WEBUI_PORT_NUMBER: "8080"
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./src:/workspace/src
+      - ./volumes/spark-events:/tmp/spark-events
+    networks: [bdp]
+
+  spark-worker:
+    image: bitnami/spark:3.5
+    container_name: bdp-spark-worker
+    restart: unless-stopped
+    depends_on:
+      - spark-master
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 4G
+      SPARK_WORKER_CORES: "2"
+      SPARK_WORKER_WEBUI_PORT_NUMBER: "8081"
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - ./src:/workspace/src
+      - ./volumes/spark-events:/tmp/spark-events
+    networks: [bdp]
+
+  mlflow:
+    build:
+      context: ./docker/mlflow
+    container_name: bdp-mlflow
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri postgresql+psycopg2://${MLFLOW_DB_USER}:${MLFLOW_DB_PASSWORD}@postgres:5432/${MLFLOW_DB}
+      --default-artifact-root s3://mlflow/
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - ./src:/workspace/src
+    networks: [bdp]
+
+  devbox:
+    build:
+      context: ./docker/devbox
+    container_name: bdp-devbox
+    profiles: ["dev"]
+    tty: true
+    stdin_open: true
+    command: sleep infinity
+    volumes:
+      - ./:/workspace
+    working_dir: /workspace
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      - kafka
+      - minio
+      - spark-master
+      - mlflow
+    networks: [bdp]
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: bdp-prometheus
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./compose/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks: [bdp]
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: bdp-grafana
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./volumes/grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks: [bdp]
+
+  airflow-init:
+    image: apache/airflow:2.10.5-python3.11
+    container_name: bdp-airflow-init
+    profiles: ["airflow"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: &airflow-env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@postgres:5432/${AIRFLOW_DB}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      TZ: ${TZ}
+    user: "${AIRFLOW_UID}:0"
+    volumes:
+      - ./src/airflow/dags:/opt/airflow/dags
+      - ./src/airflow/logs:/opt/airflow/logs
+      - ./src/airflow/plugins:/opt/airflow/plugins
+      - ./src/airflow/config:/opt/airflow/config
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      airflow db migrate &&
+      airflow users create
+      --username admin
+      --password ${AIRFLOW_ADMIN_PASSWORD}
+      --firstname Admin
+      --lastname User
+      --role Admin
+      --email admin@example.com || true
+      "
+    networks: [bdp]
+
+  airflow-webserver:
+    image: apache/airflow:2.10.5-python3.11
+    container_name: bdp-airflow-web
+    profiles: ["airflow"]
+    restart: unless-stopped
+    depends_on:
+      - airflow-init
+    environment: *airflow-env
+    user: "${AIRFLOW_UID}:0"
+    command: airflow webserver
+    ports:
+      - "127.0.0.1:8088:8080"
+    volumes:
+      - ./src/airflow/dags:/opt/airflow/dags
+      - ./src/airflow/logs:/opt/airflow/logs
+      - ./src/airflow/plugins:/opt/airflow/plugins
+      - ./src/airflow/config:/opt/airflow/config
+    networks: [bdp]
+
+  airflow-scheduler:
+    image: apache/airflow:2.10.5-python3.11
+    container_name: bdp-airflow-scheduler
+    profiles: ["airflow"]
+    restart: unless-stopped
+    depends_on:
+      - airflow-init
+    environment: *airflow-env
+    user: "${AIRFLOW_UID}:0"
+    command: airflow scheduler
+    volumes:
+      - ./src/airflow/dags:/opt/airflow/dags
+      - ./src/airflow/logs:/opt/airflow/logs
+      - ./src/airflow/plugins:/opt/airflow/plugins
+      - ./src/airflow/config:/opt/airflow/config
+    networks: [bdp]
+
+networks:
+  bdp:
+    driver: bridge

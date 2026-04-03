@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Docker / local volumes / generated state
+volumes/
+data/
+tmp/
+*.pid
+
+# Airflow
+src/airflow/logs/
+
+# ML / model artifacts
+mlruns/
+artifacts/
+models/
+
+# Spark / build
+metastore_db/
+spark-warehouse/
+target/
+
+# Terraform if added later
+.terraform/
+*.tfstate
+*.tfstate.*
+
