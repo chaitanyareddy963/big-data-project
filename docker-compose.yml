@@ -6,13 +6,22 @@ services:
     container_name: aviation-jupyter
     ports:
       - "8888:8888"
+      - "4040-4042:4040-4042"
     env_file:
       - .env
     environment:
       JUPYTER_ENABLE_LAB: "yes"
       JUPYTER_TOKEN: "${JUPYTER_TOKEN}"
+      # Override SPARK_HOME to use pip-installed pyspark 4.0.0 JARs,
+      # NOT the base image's pre-installed Spark 4.1.1 at /usr/local/spark.
+      # Driver and cluster must use the same version JARs.
+      SPARK_HOME: /opt/conda/lib/python3.13/site-packages/pyspark
+      # Tell PySpark which Python workers should use (must match driver = 3.13)
+      PYSPARK_PYTHON: python3.13
     volumes:
       - ./:/home/jovyan/work
+      - ./:/workspace
+      - spark-models:/spark-models
     depends_on:
       - minio
       - kafka
@@ -41,7 +50,7 @@ services:
     env_file:
       - .env
     entrypoint: >
-      /bin/sh -c " sleep 8; mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; mc mb -p local/raw || true; mc mb -p local/lakehouse || true; mc mb -p local/warehouse || true; mc ls local; exit 0; "
+      /bin/sh -c " sleep 8; mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; mc mb -p local/raw || true; mc mb -p local/lakehouse || true; mc mb -p local/warehouse || true; mc mb -p local/mlflow || true; mc ls local; exit 0; "
     networks:
       - aviation-net
 
@@ -71,6 +80,66 @@ services:
       - kafka-data:/var/lib/kafka/data
     networks:
       - aviation-net
+  spark-master:
+    build:
+      context: .
+      dockerfile: docker/spark.Dockerfile
+    container_name: aviation-spark-master
+    environment:
+      SPARK_MODE: master
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8080
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - ./:/workspace
+      - spark-models:/spark-models
+    networks:
+      - aviation-net
+
+  spark-worker:
+    build:
+      context: .
+      dockerfile: docker/spark.Dockerfile
+    container_name: aviation-spark-worker
+    environment:
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_MEMORY: 4G
+      SPARK_WORKER_CORES: 2
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./:/workspace
+      - spark-models:/spark-models
+    networks:
+      - aviation-net
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.2
+    container_name: aviation-mlflow
+    command: >
+      mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts --host 0.0.0.0 --port 5000
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - mlflow-data:/mlflow
+    depends_on:
+      - minio
+      - mc
+    networks:
+      - aviation-net
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -88,6 +157,8 @@ services:
 volumes:
   minio-data:
   kafka-data:
+  mlflow-data:
+  spark-models:
 
 networks:
   aviation-net:

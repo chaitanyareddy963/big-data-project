@@ -7,3 +7,15 @@ logs/
 .DS_Store
 .vscode/
 .idea/
+# Large/local dependency artifacts
+*.jar
+
+# Local model artifacts
+models/
+spark-models/
+
+# Notebook-generated local data copies
+notebooks/**/data/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
