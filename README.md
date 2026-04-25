@@ -66,57 +66,60 @@ Evidence is available in:
 
 docs/screenshots/progress_review_2/
 docs/review_notes/progress_review_2.md
-Services
+## Services
 
 The project currently runs the following services through Docker Compose:
 
-Service	Purpose	URL
-JupyterLab	Main development and notebook execution environment	http://localhost:8888
+| Service | Purpose | URL |
+|---|---|---|
+| JupyterLab | Main development and notebook execution environment | http://localhost:8888 |
+| MinIO | S3-compatible object storage / lakehouse storage | http://localhost:9001 |
+| Kafka | Real-time streaming ingestion | Internal: kafka:9092 |
+| Kafka UI | Kafka topic inspection | http://localhost:8085 |
+| Spark Master | Spark cluster manager | http://localhost:8080 |
+| Spark Worker | Spark execution worker | http://localhost:8081 |
+| MLflow | Experiment tracking | http://localhost:5000 |
 
-MinIO	S3-compatible object storage / lakehouse storage	http://localhost:9001
+### Start Services
 
-Kafka	Real-time streaming ingestion	Internal: kafka:9092
-Kafka UI	Kafka topic inspection	http://localhost:8085
-
-Spark Master	Spark cluster manager	http://localhost:8080
-
-Spark Worker	Spark execution worker	http://localhost:8081
-
-MLflow	Experiment tracking	http://localhost:5000
-Start Services
+```bash
 docker compose up -d minio mc kafka kafka-ui jupyter spark-master spark-worker mlflow
+```
 
 Check running containers:
 
+```bash
 docker compose ps
+```
 
 Open:
+- **JupyterLab:** http://localhost:8888
+- **MinIO:** http://localhost:9001
+- **Kafka UI:** http://localhost:8085
+- **Spark UI:** http://localhost:8080
+- **MLflow:** http://localhost:5000
 
-JupyterLab: http://localhost:8888
-MinIO:      http://localhost:9001
-Kafka UI:  http://localhost:8085
-Spark UI:  http://localhost:8080
-MLflow:    http://localhost:5000
-Environment
+## Environment
 
-The project uses environment variables from .env.
+The project uses environment variables from `.env`.
 
-A sample file is provided:
+A sample file is provided: `.env.example`
 
-.env.example
+**Do not commit the real `.env` file.**
 
-Do not commit the real .env file.
-
-Progress Review 1 Notebooks
+## Progress Review 1 Notebooks
 
 Run in this order:
 
-notebooks/pr1/00_environment_smoke_test.ipynb
-notebooks/pr1/01_download_era5_sample_to_minio.ipynb
-notebooks/pr1/02_kafka_to_minio_consumer.ipynb
-notebooks/pr1/03_kafka_replay_producer.ipynb
-notebooks/pr1/04_validate_streamed_storage.ipynb
-PR1 Demo Flow
+1. `notebooks/pr1/00_environment_smoke_test.ipynb`
+2. `notebooks/pr1/01_download_era5_sample_to_minio.ipynb`
+3. `notebooks/pr1/02_kafka_to_minio_consumer.ipynb`
+4. `notebooks/pr1/03_kafka_replay_producer.ipynb`
+5. `notebooks/pr1/04_validate_streamed_storage.ipynb`
+
+### PR1 Demo Flow
+
+```text
 ERA5 sample download
     ↓
 Save sample to MinIO raw bucket
@@ -128,18 +131,23 @@ Consume Kafka events
 Write streamed events to MinIO
     ↓
 Validate stored rows
-Progress Review 2 Notebooks
+```
+
+## Progress Review 2 Notebooks
 
 Run in this order:
 
-notebooks/pr2/05_spark_smoke_test.ipynb
-notebooks/pr2/06_spark_read_minio_raw.ipynb
-notebooks/pr2/07_create_bronze_weather_table.ipynb
-notebooks/pr2/08_create_labels.ipynb
-notebooks/pr2/09_feature_engineering.ipynb
-notebooks/pr2/10_train_spark_mllib_model.ipynb
-notebooks/pr2/11_mlflow_experiments.ipynb
-PR2 Demo Flow
+1. `notebooks/pr2/05_spark_smoke_test.ipynb`
+2. `notebooks/pr2/06_spark_read_minio_raw.ipynb`
+3. `notebooks/pr2/07_create_bronze_weather_table.ipynb`
+4. `notebooks/pr2/08_create_labels.ipynb`
+5. `notebooks/pr2/09_feature_engineering.ipynb`
+6. `notebooks/pr2/10_train_spark_mllib_model.ipynb`
+7. `notebooks/pr2/11_mlflow_experiments.ipynb`
+
+### PR2 Demo Flow
+
+```text
 Spark reads raw Kafka-streamed events from MinIO
     ↓
 Bronze weather table is created
@@ -151,17 +159,17 @@ Gold training features are created
 Spark MLlib Random Forest model is trained
     ↓
 MLflow logs experiment runs and metrics
-Lakehouse Layout
+```
+## Lakehouse Layout
 
-MinIO buckets:
+**MinIO buckets:**
+- `raw`
+- `lakehouse`
+- `warehouse`
+- `mlflow`
 
-raw
-lakehouse
-warehouse
-mlflow
-
-Current lakehouse paths:
-
+**Current lakehouse paths:**
+```text
 raw/era5_sample/
 raw/kafka_weather_events/
 
@@ -173,51 +181,52 @@ lakehouse/silver/weather_labeled_delta/
 
 lakehouse/gold/training_features_parquet/
 lakehouse/gold/training_features_delta/
-Model Artifact
+```
+
+## Model Artifact
 
 The Spark MLlib model is saved inside a Docker named volume mounted at:
+`/spark-models/pr2_random_forest_model`
 
-/spark-models/pr2_random_forest_model
+## MLflow Experiment
 
-MLflow Experiment
-
-Experiment name:
-
-aviation_disruption_pr2
+**Experiment name:**
+`aviation_disruption_pr2`
 
 The experiment contains multiple runs comparing:
+- Random Forest with different tree/depth settings
+- Logistic Regression baseline
 
-Random Forest with different tree/depth settings
-Logistic Regression baseline
+**Metrics logged:**
+- `accuracy`
+- `f1`
+- `auc`
 
-Metrics logged:
-
-accuracy
-f1
-auc
-Current Dataset Scope
+## Current Dataset Scope
 
 For Progress Reviews 1 and 2, the project uses a small ARCO-ERA5 sample:
-
-Airport: JFK
-Date range: 2022-01-01 to 2022-01-03
-Frequency: hourly
-Rows: 72
+- **Airport:** JFK
+- **Date range:** 2022-01-01 to 2022-01-03
+- **Frequency:** hourly
+- **Rows:** 72
 
 This small dataset is intentional for progress-review stability. The dataset will be expanded after Progress Review 2.
 
-Next Planned Work
+## Next Planned Work
 
 After Progress Review 2:
 
 1. Expand dataset to more airports and longer time range.
-2. Convert important notebook logic into production .py Spark jobs.
+2. Convert important notebook logic into production `.py` Spark jobs.
 3. Add Spark Structured Streaming scoring.
 4. Add Airflow orchestration.
 5. Add BentoML REST API serving.
 6. Add Prometheus + Grafana monitoring.
 7. Prepare final live demo flow.
-Repository Structure
+
+## Repository Structure
+
+```text
 aviation-weather-disruption/
   docker-compose.yml
   README.md
@@ -237,3 +246,4 @@ aviation-weather-disruption/
   spark_jobs/
   ml/
   models/
+```
