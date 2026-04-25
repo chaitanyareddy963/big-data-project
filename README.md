@@ -36,18 +36,19 @@ Kafka consumer notebook
 MinIO raw/kafka_weather_events/
     ↓
 Validation notebook
+```
 
-Evidence is available in:
+**Evidence is available in:**
+- `docs/screenshots/progress_review_1/`
+- `docs/review_notes/progress_review_1.md`
 
-docs/screenshots/progress_review_1/
-docs/review_notes/progress_review_1.md
-
-Progress Review 2 — Complete
+### Progress Review 2 — Complete
 
 Progress Review 2 demonstrates Spark processing and ML training.
 
-Working flow:
+**Working flow:**
 
+```text
 MinIO raw Kafka events
     ↓
 Spark processing
@@ -61,11 +62,11 @@ Gold training features
 Spark MLlib Random Forest model
     ↓
 MLflow experiment tracking
+```
 
-Evidence is available in:
-
-docs/screenshots/progress_review_2/
-docs/review_notes/progress_review_2.md
+**Evidence is available in:**
+- `docs/screenshots/progress_review_2/`
+- `docs/review_notes/progress_review_2.md`
 ## Services
 
 The project currently runs the following services through Docker Compose:
