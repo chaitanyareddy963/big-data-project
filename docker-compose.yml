@@ -1,0 +1,94 @@
+services:
+  jupyter:
+    build:
+      context: .
+      dockerfile: docker/jupyter.Dockerfile
+    container_name: aviation-jupyter
+    ports:
+      - "8888:8888"
+    env_file:
+      - .env
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      JUPYTER_TOKEN: "${JUPYTER_TOKEN}"
+    volumes:
+      - ./:/home/jovyan/work
+    depends_on:
+      - minio
+      - kafka
+    networks:
+      - aviation-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: aviation-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file:
+      - .env
+    volumes:
+      - minio-data:/data
+    networks:
+      - aviation-net
+
+  mc:
+    image: minio/mc:latest
+    container_name: aviation-mc
+    depends_on:
+      - minio
+    env_file:
+      - .env
+    entrypoint: >
+      /bin/sh -c " sleep 8; mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}; mc mb -p local/raw || true; mc mb -p local/lakehouse || true; mc mb -p local/warehouse || true; mc ls local; exit 0; "
+    networks:
+      - aviation-net
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: aviation-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - aviation-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: aviation-kafka-ui
+    ports:
+      - "8085:8080"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: aviation-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - aviation-net
+
+volumes:
+  minio-data:
+  kafka-data:
+
+networks:
+  aviation-net:
+    driver: bridge
