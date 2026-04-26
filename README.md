@@ -138,13 +138,13 @@ Validate stored rows
 
 Run in this order:
 
-1. `notebooks/pr2/05_spark_smoke_test.ipynb`
-2. `notebooks/pr2/06_spark_read_minio_raw.ipynb`
-3. `notebooks/pr2/07_create_bronze_weather_table.ipynb`
-4. `notebooks/pr2/08_create_labels.ipynb`
-5. `notebooks/pr2/09_feature_engineering.ipynb`
-6. `notebooks/pr2/10_train_spark_mllib_model.ipynb`
-7. `notebooks/pr2/11_mlflow_experiments.ipynb`
+1. `notebooks/pr2/01_spark_smoke_test.ipynb`
+2. `notebooks/pr2/02_spark_read_minio_raw.ipynb`
+3. `notebooks/pr2/03_create_bronze_weather_table.ipynb`
+4. `notebooks/pr2/04_create_labels.ipynb`
+5. `notebooks/pr2/05_feature_engineering.ipynb`
+6. `notebooks/pr2/06_train_spark_mllib_model.ipynb`
+7. `notebooks/pr2/07_mlflow_experiments.ipynb`
 
 ### PR2 Demo Flow
 
