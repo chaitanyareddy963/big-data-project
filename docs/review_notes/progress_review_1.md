@@ -1,54 +1,32 @@
-# Progress Review 1 — Ingestion + Storage Demo
-
-## Project
-
-Real-Time Aviation Weather Disruption Intelligence Platform
+# Phase 1 Demo: Original Data Ingestion and Storage
 
 ## Scope
 
-This review demonstrates the ingestion and storage slice:
+This revised presentation demonstrates:
 
-ARCO-ERA5 sample → Kafka topic → Kafka consumer → MinIO raw storage → validation notebook.
+```text
+Original ARCO-ERA5 MinIO partition
+  -> Spark-selected representative replay slice
+  -> Kafka topic weather.raw
+  -> Kafka consumer
+  -> MinIO raw/kafka_weather_events_original/
+  -> validation notebook
+```
 
-## Services
+The old 72-row JFK review fixture is no longer the presentation source.
 
-- JupyterLab
-- Apache Kafka
-- Kafka UI
-- MinIO
-- Python Kafka producer notebook
-- Python Kafka consumer notebook
+## Notebook Order
 
-## Data
-
-- Source: ARCO-ERA5
-- Airport: JFK
-- Time range: 2022-01-01 to 2022-01-03
-- Frequency: hourly
-- Records: 72
-- Variables:
-  - 2m temperature
-  - 10m U wind
-  - 10m V wind
-  - total precipitation
-  - surface pressure
-  - CAPE
-
-## Demo Flow
-
-1. Show containers running.
-2. Show real ERA5 data downloaded in Notebook 01.
-3. Show sample stored in MinIO raw bucket.
-4. Show Kafka topic `weather.raw`.
-5. Run consumer notebook.
-6. Run producer notebook.
-7. Show messages flowing.
-8. Show streamed JSONL objects written to MinIO.
-9. Run validation notebook and show row count.
+1. `notebooks/pr1/00_environment_smoke_test.ipynb`
+2. `notebooks/pr1/01_download_era5_sample_to_minio.ipynb`
+3. `notebooks/pr1/02_kafka_to_minio_consumer.ipynb`
+4. `notebooks/pr1/03_kafka_replay_producer.ipynb`
+5. `notebooks/pr1/04_validate_streamed_storage.ipynb`
 
 ## Evidence
 
-- Real data is used, not fake generated rows.
-- Kafka is used for streaming ingestion.
-- MinIO stores both downloaded sample and streamed events.
-- Jupyter notebooks document every step clearly.
+- MinIO contains the original 2015-2024 ARCO-ERA5 dataset.
+- Kafka replay records are selected from an original monthly Parquet partition.
+- The consumer stores live JSONL micro-batches in MinIO.
+- The validation notebook reports row count, airport count, timestamp range,
+  and stored object count for the latest replay.

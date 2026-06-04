@@ -1,41 +1,40 @@
-# Progress Review 2 — Spark Processing + ML Training
+# Phase 2 Demo: Spark Lakehouse and ML Diagnostics
 
 ## Scope
 
-This review demonstrates Spark processing and ML training on aviation weather lakehouse data.
+This revised presentation demonstrates:
 
-## Flow
+```text
+Original ARCO-ERA5 weather + official BTS flights in MinIO
+  -> Spark S3A direct reads
+  -> Bronze weather and BTS flight tables
+  -> Silver flight-weather join with real BTS outcomes
+  -> Gold leakage-conscious features
+  -> Spark MLlib diagnostic runs
+  -> MLflow comparison
+```
 
-MinIO raw Kafka events → Spark DataFrame → Bronze table → Silver labels → Gold training features → Spark MLlib model → MLflow runs.
+## Notebook Order
 
-## Services
+1. `notebooks/pr2/01_spark_smoke_test.ipynb`
+2. `notebooks/pr2/02_spark_read_minio_raw.ipynb`
+3. `notebooks/pr2/03_create_bronze_weather_table.ipynb`
+4. `notebooks/pr2/04_create_labels.ipynb`
+5. `notebooks/pr2/05_feature_engineering.ipynb`
+6. `notebooks/pr2/06_train_spark_mllib_model.ipynb`
+7. `notebooks/pr2/07_mlflow_experiments.ipynb`
 
-- JupyterLab
-- MinIO
-- Apache Spark master
-- Apache Spark worker
-- MLflow
+## Verified January 2024 Evidence
 
-## Notebooks
-
-1. `notebooks/pr2/05_spark_smoke_test.ipynb`
-2. `notebooks/pr2/06_spark_read_minio_raw.ipynb`
-3. `notebooks/pr2/07_create_bronze_weather_table.ipynb`
-4. `notebooks/pr2/08_create_labels.ipynb`
-5. `notebooks/pr2/09_feature_engineering.ipynb`
-6. `notebooks/pr2/10_train_spark_mllib_model.ipynb`
-7. `notebooks/pr2/11_mlflow_experiments.ipynb`
-
-## Evidence
-
-- Spark connects to the Spark master and worker.
-- Spark reads Kafka-streamed weather data from MinIO.
-- Bronze, Silver, and Gold lakehouse tables are created.
-- A Spark MLlib Random Forest model is trained.
-- The model is saved to `/spark-models/pr2_random_forest_model`.
-- MLflow records experiment runs under `aviation_disruption_pr2`.
-- Screenshots are saved under `docs/screenshots/progress_review_2/`.
+- Original weather rows: 18,693,744.
+- Official BTS flight rows: 547,271.
+- Flights matched to weather: 543,121.
+- Non-disrupted flights: 397,465.
+- Disrupted flights: 145,656.
+- Labels come from BTS cancellations or arrival delays of at least 15 minutes.
+- Outcome columns are excluded from Gold model features.
 
 ## Notes
 
-The PR2 dataset is intentionally small because the goal is to demonstrate pipeline correctness. The full dataset scaling will be done after PR2.
+The initial diagnostic uses a random split. Before final model selection, add
+class-imbalance handling, threshold tuning, and chronological validation.

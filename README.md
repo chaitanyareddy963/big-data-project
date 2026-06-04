@@ -4,113 +4,81 @@ Z5008 Big Data Lab course project.
 
 ## Project Overview
 
-This project builds a real-time aviation weather disruption intelligence platform.
+This project builds an aviation disruption intelligence platform from original
+ARCO-ERA5 weather data and official BTS Reporting Carrier On-Time Performance
+records.
 
-The system uses historical ARCO-ERA5 weather data, replays it as a Kafka stream, stores the streamed data in MinIO, processes it with Spark, trains a Spark MLlib model, and tracks experiments using MLflow.
-
-The final project goal is to build an end-to-end Big Data + MLOps platform for airport-level disruption risk scoring.
-
----
-
-## Current Status
-
-### Progress Review 1 — Complete
-
-Progress Review 1 demonstrates the ingestion and storage layer.
-
-Working flow:
+The live demo combines:
 
 ```text
-ARCO-ERA5 weather sample
-    ↓
-JupyterLab download notebook
-    ↓
-MinIO raw bucket
-    ↓
-Kafka replay producer notebook
-    ↓
-Kafka topic weather.raw
-    ↓
-Kafka consumer notebook
-    ↓
-MinIO raw/kafka_weather_events/
-    ↓
-Validation notebook
+Original ARCO-ERA5 weather in MinIO
+    -> bounded representative Kafka replay
+    -> Kafka consumer micro-batches in MinIO raw storage
+    -> Spark Bronze weather and BTS flight tables
+    -> Spark Silver flight-weather join with real BTS outcomes
+    -> Spark Gold leakage-conscious features
+    -> Spark MLlib experiments
+    -> MLflow diagnostic run comparison
 ```
 
-**Evidence is available in:**
-- `docs/screenshots/progress_review_1/`
-- `docs/review_notes/progress_review_1.md`
+The original raw datasets remain immutable. Kafka demonstrates the streaming
+layer with a controlled replay slice; Spark batch jobs process the larger
+monthly partitions directly.
 
-### Progress Review 2 — Complete
+## Original Dataset Scope
 
-Progress Review 2 demonstrates Spark processing and ML training.
+Raw datasets currently stored in MinIO:
 
-**Working flow:**
+| Dataset | Scope | MinIO path |
+|---|---|---|
+| ARCO-ERA5 airport-hour weather | 2015-2024, 720 Parquet files, 120 monthly partitions | `raw/arco_era5_us_airport_hourly/` |
+| BTS on-time flight records | 2015-2024, 120 monthly ZIP archives | `raw/bts_on_time/raw_zip/` |
+| OurAirports metadata | Airport and ERA5 grid mapping files | `raw/metadata/ourairports/` |
 
-```text
-MinIO raw Kafka events
-    ↓
-Spark processing
-    ↓
-Bronze weather table
-    ↓
-Silver labeled table
-    ↓
-Gold training features
-    ↓
-Spark MLlib Random Forest model
-    ↓
-MLflow experiment tracking
-```
+The first verified large-data proof uses January 2024:
 
-**Evidence is available in:**
-- `docs/screenshots/progress_review_2/`
-- `docs/review_notes/progress_review_2.md`
+| Layer | Rows |
+|---|---:|
+| Original ARCO-ERA5 weather | 18,693,744 |
+| Bronze BTS flights | 547,271 |
+| Silver matched flight-weather rows | 543,121 |
+| Gold training rows | 543,121 |
+
 ## Services
-
-The project currently runs the following services through Docker Compose:
 
 | Service | Purpose | URL |
 |---|---|---|
-| JupyterLab | Main development and notebook execution environment | http://localhost:8888 |
-| MinIO | S3-compatible object storage / lakehouse storage | http://localhost:9001 |
-| Kafka | Real-time streaming ingestion | Internal: kafka:9092 |
-| Kafka UI | Kafka topic inspection | http://localhost:8085 |
-| Spark Master | Spark cluster manager | http://localhost:8080 |
-| Spark Worker | Spark execution worker | http://localhost:8081 |
+| JupyterLab | Notebook demo environment | http://localhost:8888 |
+| MinIO | S3-compatible storage | http://localhost:9001 |
+| Kafka | Streaming ingestion | Internal: `kafka:9092` |
+| Kafka UI | Topic inspection | http://localhost:8085 |
+| Spark Master | Cluster manager | http://localhost:8080 |
+| Spark Worker | Spark executor | http://localhost:8081 |
 | MLflow | Experiment tracking | http://localhost:5000 |
+| Airflow | Scheduled pipeline orchestration | http://localhost:8088 |
+| BentoML API | Disruption prediction endpoint | http://localhost:3000 |
+| Prometheus | API metrics collection | http://localhost:9090 |
+| Grafana | Live monitoring dashboard | http://localhost:3001 |
 
-### Start Services
+Start services:
 
 ```bash
 docker compose up -d minio mc kafka kafka-ui jupyter spark-master spark-worker mlflow
-```
-
-Check running containers:
-
-```bash
 docker compose ps
 ```
 
-Open:
-- **JupyterLab:** http://localhost:8888
-- **MinIO:** http://localhost:9001
-- **Kafka UI:** http://localhost:8085
-- **Spark UI:** http://localhost:8080
-- **MLflow:** http://localhost:5000
+Copy `.env.example` to `.env`, replace placeholder secrets, and keep `.env`
+untracked.
 
-## Environment
+## Notebook Presentation Flow
 
-The project uses environment variables from `.env`.
+The notebooks are the live presentation layer. They show important code,
+schemas, previews, checks, charts, and conclusions cell by cell. See
+`notebooks/README.md`.
 
-A sample file is provided: `.env.example`
+### Phase 1: Ingestion and Storage
 
-**Do not commit the real `.env` file.**
-
-## Progress Review 1 Notebooks
-
-Run in this order:
+Run:
 
 1. `notebooks/pr1/00_environment_smoke_test.ipynb`
 2. `notebooks/pr1/01_download_era5_sample_to_minio.ipynb`
@@ -118,25 +86,12 @@ Run in this order:
 4. `notebooks/pr1/03_kafka_replay_producer.ipynb`
 5. `notebooks/pr1/04_validate_streamed_storage.ipynb`
 
-### PR1 Demo Flow
+Despite its historical filename, notebook `01` now inventories the original
+large MinIO datasets. The producer no longer reads the old 72-row JFK fixture.
 
-```text
-ERA5 sample download
-    ↓
-Save sample to MinIO raw bucket
-    ↓
-Replay sample rows into Kafka
-    ↓
-Consume Kafka events
-    ↓
-Write streamed events to MinIO
-    ↓
-Validate stored rows
-```
+### Phase 2: Spark Lakehouse and ML Diagnostics
 
-## Progress Review 2 Notebooks
-
-Run in this order:
+Run:
 
 1. `notebooks/pr2/01_spark_smoke_test.ipynb`
 2. `notebooks/pr2/02_spark_read_minio_raw.ipynb`
@@ -146,105 +101,88 @@ Run in this order:
 6. `notebooks/pr2/06_train_spark_mllib_model.ipynb`
 7. `notebooks/pr2/07_mlflow_experiments.ipynb`
 
-### PR2 Demo Flow
+Notebook `04` now creates or inspects Bronze BTS data. Notebook `05` creates
+labels from actual BTS cancellation and arrival-delay outcomes. The removed
+weather-rule proxy label must not be presented as model quality evidence.
+
+## Production Spark Jobs
+
+The course rubric requires production Spark jobs as `.py` files, not only
+notebooks. Reusable jobs live under `spark_jobs/`:
 
 ```text
-Spark reads raw Kafka-streamed events from MinIO
-    ↓
-Bronze weather table is created
-    ↓
-Silver labeled table is created
-    ↓
-Gold training features are created
-    ↓
-Spark MLlib Random Forest model is trained
-    ↓
-MLflow logs experiment runs and metrics
+spark_jobs/validate_raw_weather.py
+spark_jobs/build_bronze_weather.py
+spark_jobs/build_bronze_bts.py
+spark_jobs/build_silver_flight_weather.py
+spark_jobs/build_gold_features.py
+spark_jobs/train_mllib_experiments.py
+spark_jobs/build_delta_lakehouse.py
+spark_jobs/stream_kafka_weather_to_delta.py
 ```
+
+Run the January proof from the Jupyter container:
+
+```bash
+docker compose exec jupyter bash
+cd /workspace
+
+python -m spark_jobs.validate_raw_weather --year 2024 --month 1
+python -m spark_jobs.build_bronze_weather --year 2024 --month 1
+python -m spark_jobs.build_bronze_bts --year 2024 --month 1
+python -m spark_jobs.build_silver_flight_weather --year 2024 --month 1
+python -m spark_jobs.build_gold_features --year 2024 --month 1
+python -m spark_jobs.train_mllib_experiments --year 2024 --month 1
+python -m spark_jobs.build_delta_lakehouse --year 2024 --month 1
+python -m spark_jobs.stream_kafka_weather_to_delta --trigger-once
+python -m ml.train_register_model
+```
+
 ## Lakehouse Layout
 
-**MinIO buckets:**
-- `raw`
-- `lakehouse`
-- `warehouse`
-- `mlflow`
-
-**Current lakehouse paths:**
 ```text
-raw/era5_sample/
-raw/kafka_weather_events/
+raw/arco_era5_us_airport_hourly/
+raw/bts_on_time/raw_zip/
+raw/metadata/
+raw/kafka_weather_events_original/
 
-lakehouse/bronze/weather_events_parquet/
-lakehouse/bronze/weather_events_delta/
+lakehouse/bronze/weather/year=2024/month=01/
+lakehouse/bronze/bts_on_time/year=2024/month=01/
+lakehouse/silver/flight_weather_daily/year=2024/month=01/
+lakehouse/gold/training_features/year=2024/month=01/
 
-lakehouse/silver/weather_labeled_parquet/
-lakehouse/silver/weather_labeled_delta/
-
-lakehouse/gold/training_features_parquet/
-lakehouse/gold/training_features_delta/
+lakehouse/bronze_delta/weather/year=2024/month=01/
+lakehouse/bronze_delta/bts_on_time/year=2024/month=01/
+lakehouse/silver_delta/flight_weather_daily/year=2024/month=01/
+lakehouse/gold_delta/training_features/year=2024/month=01/
+lakehouse/bronze_delta/kafka_weather_events/
 ```
 
-## Model Artifact
+Partitioned Parquet remains as an auditable intermediate. Production Delta Lake
+tables add transaction logs for the final platform and Structured Streaming
+writes Kafka events into a Delta sink with a MinIO checkpoint.
 
-The Spark MLlib model is saved inside a Docker named volume mounted at:
-`/spark-models/pr2_random_forest_model`
+## Final Platform Layers
 
-## MLflow Experiment
+Additional components:
 
-**Experiment name:**
-`aviation_disruption_pr2`
+- `dags/aviation_lakehouse_dag.py`: scheduled Airflow pipeline.
+- `ml/train_register_model.py`: balanced chronological Spark MLlib model,
+  MLflow artifact logging, registry version creation, and staging/production
+  aliases.
+- `api/service.py`: BentoML `POST /predict` endpoint.
+- `api/load_test.py`: 100-request, 10-concurrent-request stability demo.
+- `dashboards/`: Prometheus scrape configuration and provisioned Grafana
+  dashboard with three panels.
+- `tests/`: focused tests for BTS archive validation and API scoring.
 
-The experiment contains multiple runs comparing:
-- Random Forest with different tree/depth settings
-- Logistic Regression baseline
+Run the full final demonstration using:
 
-**Metrics logged:**
-- `accuracy`
-- `f1`
-- `auc`
-
-## Current Dataset Scope
-
-For Progress Reviews 1 and 2, the project uses a small ARCO-ERA5 sample:
-- **Airport:** JFK
-- **Date range:** 2022-01-01 to 2022-01-03
-- **Frequency:** hourly
-- **Rows:** 72
-
-This small dataset is intentional for progress-review stability. The dataset will be expanded after Progress Review 2.
-
-## Next Planned Work
-
-After Progress Review 2:
-
-1. Expand dataset to more airports and longer time range.
-2. Convert important notebook logic into production `.py` Spark jobs.
-3. Add Spark Structured Streaming scoring.
-4. Add Airflow orchestration.
-5. Add BentoML REST API serving.
-6. Add Prometheus + Grafana monitoring.
-7. Prepare final live demo flow.
-
-## Repository Structure
-
-```text
-aviation-weather-disruption/
-  docker-compose.yml
-  README.md
-  .env.example
-  docker/
-    jupyter.Dockerfile
-  configs/
-    progress_review_1.yaml
-  notebooks/
-    pr1/
-    pr2/
-  docs/
-    review_notes/
-    screenshots/
-  data/
-    sample/
-  spark_jobs/
-  ml/
-  models/
+```bash
+docker compose up -d airflow
+docker compose up -d aviation-api prometheus grafana
+python3 api/load_test.py --requests 100 --concurrency 10
 ```
+
+See `docs/final_demo/02_full_platform_runbook.md` and
+`notebooks/final/08_full_platform_demo.ipynb`.

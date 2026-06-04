@@ -29,11 +29,13 @@ RUN pip install --no-cache-dir \
     pyyaml \
     python-dotenv \
     kafka-python \
+    delta-spark==4.0.0 \
     deltalake \
     tqdm \
     matplotlib \
     mlflow \
-    scikit-learn
+    scikit-learn \
+    pytest
 
 # Copy S3A JARs from bitnami Spark into PySpark jars so the driver can talk to MinIO
 USER root

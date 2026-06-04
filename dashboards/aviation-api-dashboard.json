@@ -1,0 +1,31 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {
+      "title": "Prediction Requests Per Second",
+      "type": "timeseries",
+      "targets": [{"expr": "sum(rate(aviation_prediction_requests_total[1m]))", "legendFormat": "requests/s"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "title": "Prediction Latency P95",
+      "type": "timeseries",
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(aviation_prediction_latency_seconds_bucket[1m])) by (le))", "legendFormat": "p95 seconds"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "title": "Predictions By Risk Band",
+      "type": "timeseries",
+      "targets": [{"expr": "sum by (risk_band) (aviation_prediction_requests_total)", "legendFormat": "{{risk_band}}"}],
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["aviation", "bentoml", "prometheus"],
+  "templating": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "title": "Aviation Disruption API",
+  "uid": "aviation-disruption-api",
+  "version": 1
+}

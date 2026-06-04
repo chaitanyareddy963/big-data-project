@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: docker/jupyter.Dockerfile
     container_name: aviation-jupyter
+    user: root
     ports:
       - "8888:8888"
       - "4040-4042:4040-4042"
@@ -12,6 +13,11 @@ services:
     environment:
       JUPYTER_ENABLE_LAB: "yes"
       JUPYTER_TOKEN: "${JUPYTER_TOKEN}"
+      # Run the notebook server as the host VM user so .ipynb saves from
+      # Jupyter persist directly into the bind-mounted repository.
+      NB_UID: "${HOST_UID:-1002}"
+      NB_GID: "${HOST_GID:-1005}"
+      CHOWN_HOME: "yes"
       # Override SPARK_HOME to use pip-installed pyspark 4.0.0 JARs,
       # NOT the base image's pre-installed Spark 4.1.1 at /usr/local/spark.
       # Driver and cluster must use the same version JARs.
@@ -123,7 +129,7 @@ services:
     image: ghcr.io/mlflow/mlflow:v2.17.2
     container_name: aviation-mlflow
     command: >
-      mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts --host 0.0.0.0 --port 5000
+      mlflow server --backend-store-uri sqlite:////mlflow/mlflow.db --serve-artifacts --artifacts-destination /mlflow/artifacts --host 0.0.0.0 --port 5000
     ports:
       - "5000:5000"
     env_file:
@@ -154,11 +160,77 @@ services:
     networks:
       - aviation-net
 
+  airflow:
+    image: apache/airflow:3.2.1
+    container_name: aviation-airflow
+    command: standalone
+    ports:
+      - "8088:8080"
+    environment:
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - airflow-data:/opt/airflow
+      - ./dags:/opt/airflow/dags
+      - ./:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker:ro
+    depends_on:
+      - jupyter
+    networks:
+      - aviation-net
+
+  aviation-api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: aviation-api
+    environment:
+      AVIATION_MODEL_PATH: /models/final_numeric_logistic_model.json
+    volumes:
+      - ./models:/models:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - aviation-net
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: aviation-prometheus
+    command: --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./dashboards/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - aviation-api
+    networks:
+      - aviation-net
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    container_name: aviation-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./dashboards/provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards/aviation-api-dashboard.json:/var/lib/grafana/dashboards/aviation-api-dashboard.json:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - aviation-net
+
 volumes:
   minio-data:
   kafka-data:
   mlflow-data:
   spark-models:
+  airflow-data:
+  grafana-data:
 
 networks:
   aviation-net:
