@@ -24,7 +24,14 @@ MODEL_NAME = "aviation-disruption-balanced-logistic"
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--year", type=int, default=2024)
-    parser.add_argument("--month", type=int, default=1, choices=range(1, 13))
+    parser.add_argument("--month", type=int, choices=range(1, 13))
+    parser.add_argument(
+        "--train-through-month",
+        type=int,
+        default=9,
+        choices=range(1, 12),
+        help="For full-year training, months up to this value are train and later months are test.",
+    )
     parser.add_argument("--output", default="/workspace/models/final_numeric_logistic_model.json")
     return parser.parse_args()
 
@@ -35,18 +42,31 @@ def main() -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     settings = load_settings()
     spark = create_spark_session("train-register-balanced-logistic", settings)
-    source = s3a_uri(
-        settings.lakehouse_bucket,
-        f"gold/training_features/year={args.year}/month={args.month:02d}",
-    )
+    if args.month:
+        source = s3a_uri(
+            settings.lakehouse_bucket,
+            f"gold/training_features/year={args.year}/month={args.month:02d}",
+        )
+        training_scope = f"{args.year}-{args.month:02d}-01_to_24"
+        test_scope = f"{args.year}-{args.month:02d}-25_to_end"
+    else:
+        source = s3a_uri(settings.lakehouse_bucket, f"gold/training_features/year={args.year}")
+        training_scope = f"{args.year}-01_to_{args.train_through_month:02d}"
+        test_scope = f"{args.year}-{args.train_through_month + 1:02d}_to_12"
 
     try:
         gold_df = spark.read.parquet(source)
         assembler = VectorAssembler(inputCols=NUMERIC_FEATURES, outputCol="features")
         model_df = assembler.transform(gold_df).select("flight_date", "features", "label")
-        train_df = model_df.filter(F.dayofmonth("flight_date") <= 24)
-        test_df = model_df.filter(F.dayofmonth("flight_date") > 24)
+        if args.month:
+            train_df = model_df.filter(F.dayofmonth("flight_date") <= 24)
+            test_df = model_df.filter(F.dayofmonth("flight_date") > 24)
+        else:
+            train_df = model_df.filter(F.month("flight_date") <= args.train_through_month)
+            test_df = model_df.filter(F.month("flight_date") > args.train_through_month)
         counts = {row["label"]: row["count"] for row in train_df.groupBy("label").count().collect()}
+        if 0.0 not in counts or 1.0 not in counts:
+            raise RuntimeError(f"Training data must contain both labels, found counts: {counts}")
         positive_weight = counts[0.0] / counts[1.0]
         weighted_train_df = train_df.withColumn(
             "class_weight",
@@ -78,8 +98,8 @@ def main() -> None:
             "coefficients": list(model.coefficients),
             "intercept": model.intercept,
             "threshold": model.getThreshold(),
-            "training_scope": f"{args.year}-{args.month:02d}-01_to_24",
-            "test_scope": f"{args.year}-{args.month:02d}-25_to_end",
+            "training_scope": training_scope,
+            "test_scope": test_scope,
             "positive_weight": positive_weight,
             "metrics": {
                 "auc": auc,

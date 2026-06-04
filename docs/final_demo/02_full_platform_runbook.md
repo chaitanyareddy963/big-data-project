@@ -30,6 +30,14 @@ docker compose exec jupyter bash -lc \
   'cd /workspace && python -m ml.train_register_model'
 ```
 
+For the larger one-year proof, run the monthly jobs for all 2024 months and
+then register the final full-year model:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m spark_jobs.run_year_pipeline --year 2024 --with-delta --with-final-model'
+```
+
 Open MLflow at <http://localhost:5000> and show the registered
 `aviation-disruption-balanced-logistic` model with its `staging` and
 `production` aliases.
@@ -60,6 +68,20 @@ curl -X POST http://localhost:3000/predict \
     "cape_j_kg_max": 80.0
     }
   }'
+```
+
+Call the API with a real Gold-table row:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m spark_jobs.call_api_with_gold_sample --year 2024 --month 1 --api-url http://aviation-api:3000/predict'
+```
+
+Optional live-weather inference:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.live_weather_predict --airport JFK --api-url http://aviation-api:3000/predict'
 ```
 
 Run the required 10x stability demonstration:

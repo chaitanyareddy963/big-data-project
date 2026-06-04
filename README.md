@@ -44,6 +44,11 @@ The first verified large-data proof uses January 2024:
 | Silver matched flight-weather rows | 543,121 |
 | Gold training rows | 543,121 |
 
+The final large-data path is designed to run the same pipeline for all 12
+months of a selected year across the available US airport coverage. January
+2024 remains the fast proof; the full-year runner is used when enough demo time
+and disk budget are available.
+
 ## Services
 
 | Service | Purpose | URL |
@@ -138,6 +143,21 @@ python -m spark_jobs.stream_kafka_weather_to_delta --trigger-once
 python -m ml.train_register_model
 ```
 
+Run the one-year proof for all 2024 months:
+
+```bash
+docker compose exec jupyter bash
+cd /workspace
+
+python -m spark_jobs.run_year_pipeline --year 2024 --with-delta --with-final-model
+```
+
+The runner is resumable by month:
+
+```bash
+python -m spark_jobs.run_year_pipeline --year 2024 --start-month 4 --end-month 12
+```
+
 ## Lakehouse Layout
 
 ```text
@@ -172,6 +192,10 @@ Additional components:
   aliases.
 - `api/service.py`: BentoML `POST /predict` endpoint.
 - `api/load_test.py`: 100-request, 10-concurrent-request stability demo.
+- `api/live_weather_predict.py`: optional live Open-Meteo inference demo using
+  current airport weather transformed into the model feature contract.
+- `spark_jobs/call_api_with_gold_sample.py`: calls the deployed API using a
+  real row from the Gold feature table.
 - `dashboards/`: Prometheus scrape configuration and provisioned Grafana
   dashboard with three panels.
 - `tests/`: focused tests for BTS archive validation and API scoring.
@@ -181,8 +205,11 @@ Run the full final demonstration using:
 ```bash
 docker compose up -d airflow
 docker compose up -d aviation-api prometheus grafana
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m spark_jobs.call_api_with_gold_sample --year 2024 --month 1 --api-url http://aviation-api:3000/predict'
 python3 api/load_test.py --requests 100 --concurrency 10
 ```
 
 See `docs/final_demo/02_full_platform_runbook.md` and
-`notebooks/final/08_full_platform_demo.ipynb`.
+`notebooks/final/08_full_platform_demo.ipynb`. For the larger final proof, see
+`notebooks/final/09_one_year_real_data_pipeline.ipynb`.

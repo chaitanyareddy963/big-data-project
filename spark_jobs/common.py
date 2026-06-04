@@ -57,9 +57,11 @@ def create_spark_session(
 ) -> SparkSession:
     # Spark 4 creates a relative artifacts directory during SQL actions.
     # Run from writable temporary storage instead of the mounted repository.
-    work_dir = Path(os.getenv("SPARK_WORK_DIR", "/tmp/spark-work"))
+    work_dir = Path(os.getenv("SPARK_WORK_DIR", f"/tmp/spark-work-{os.getuid()}"))
     work_dir.mkdir(parents=True, exist_ok=True)
     os.chdir(work_dir)
+    spark_local_dir = Path(os.getenv("SPARK_LOCAL_DIR", f"/tmp/spark-local-{os.getuid()}"))
+    spark_local_dir.mkdir(parents=True, exist_ok=True)
 
     builder = (
         SparkSession.builder.appName(app_name)
@@ -67,7 +69,7 @@ def create_spark_session(
         .config("spark.executor.memory", os.getenv("SPARK_EXECUTOR_MEMORY", "3g"))
         .config("spark.driver.memory", os.getenv("SPARK_DRIVER_MEMORY", "2g"))
         .config("spark.sql.shuffle.partitions", os.getenv("SPARK_SHUFFLE_PARTITIONS", "16"))
-        .config("spark.local.dir", "/tmp/spark-local")
+        .config("spark.local.dir", str(spark_local_dir))
         .config("spark.sql.legacy.parquet.nanosAsLong", "true")
         .config("spark.hadoop.fs.s3a.endpoint", settings.minio_endpoint)
         .config("spark.hadoop.fs.s3a.access.key", settings.minio_access_key)

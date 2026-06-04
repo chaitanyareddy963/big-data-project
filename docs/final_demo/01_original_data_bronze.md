@@ -39,11 +39,17 @@ Gold training features: 543,121 rows
 - The old 72-row JFK fixture is not used as final-model evidence.
 - The old generated weather-rule label is replaced by actual BTS outcomes.
 
-## Remaining Compliance Work
+## Final Platform Status
 
-- Convert production tables from partitioned Parquet to Delta Lake or Iceberg.
-- Add Spark Structured Streaming.
-- Add Airflow or Dagster orchestration.
-- Add class weighting, threshold tuning, and chronological model validation.
-- Log and register the selected model in MLflow.
-- Add BentoML serving, Grafana monitoring, tests, load testing, and a final runbook.
+- Delta Lake conversion is implemented in `spark_jobs/build_delta_lakehouse.py`.
+- Spark Structured Streaming writes Kafka events to Delta in
+  `spark_jobs/stream_kafka_weather_to_delta.py`.
+- Airflow orchestration is implemented in `dags/aviation_lakehouse_dag.py`.
+- The selected Spark MLlib model uses class weighting and chronological
+  validation in `ml/train_register_model.py`.
+- MLflow logs the selected model artifact and registers staging/production
+  aliases.
+- BentoML serving, Grafana monitoring, tests, load testing, and the final
+  runbook are present.
+- The larger final proof can run the same monthly jobs for a full selected year
+  through `spark_jobs/run_year_pipeline.py`.

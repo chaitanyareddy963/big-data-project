@@ -40,6 +40,8 @@ diagnostics using actual BTS cancellation and delay outcomes.
 After PR1 and PR2, run:
 
 1. `final/08_full_platform_demo.ipynb`
+2. `final/09_one_year_real_data_pipeline.ipynb`
 
-This notebook presents Delta Lake, Structured Streaming, Airflow, MLflow
-registry, BentoML API serving, Prometheus, Grafana, tests, and load testing.
+These notebooks present Delta Lake, Structured Streaming, Airflow, MLflow
+registry, BentoML API serving, Prometheus, Grafana, tests, load testing, the
+one-year production runner, and API prediction from a real Gold feature row.
