@@ -192,12 +192,14 @@ Additional components:
   aliases.
 - `api/service.py`: BentoML `POST /predict` endpoint.
 - `api/load_test.py`: 100-request, 10-concurrent-request stability demo.
-- `api/live_weather_predict.py`: optional live Open-Meteo inference demo using
-  current airport weather transformed into the model feature contract.
+- `api/live_weather_predict.py`: live Open-Meteo inference demo. It can run
+  once or continuously poll current airport weather and score every snapshot
+  through the deployed API.
 - `spark_jobs/call_api_with_gold_sample.py`: calls the deployed API using a
   real row from the Gold feature table.
 - `dashboards/`: Prometheus scrape configuration and provisioned Grafana
-  dashboard with three panels.
+  dashboard for request volume, latency, errors, risk-band split, and
+  probability distribution.
 - `tests/`: focused tests for BTS archive validation and API scoring.
 
 Run the full final demonstration using:
@@ -207,8 +209,14 @@ docker compose up -d airflow
 docker compose up -d aviation-api prometheus grafana
 docker compose exec jupyter bash -lc \
   'cd /workspace && python -m spark_jobs.call_api_with_gold_sample --year 2024 --month 1 --api-url http://aviation-api:3000/predict'
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.live_weather_predict --airport JFK --watch --interval-seconds 30 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk.jsonl --api-url http://aviation-api:3000/predict'
 python3 api/load_test.py --requests 100 --concurrency 10
 ```
+
+For a continuous live run, omit `--max-iterations` and stop it with
+`Ctrl+C`. Open Grafana at <http://localhost:3001> while the live loop or load
+test is running.
 
 See `docs/final_demo/02_full_platform_runbook.md` and
 `notebooks/final/08_full_platform_demo.ipynb`. For the larger final proof, see

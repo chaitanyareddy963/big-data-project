@@ -77,12 +77,21 @@ docker compose exec jupyter bash -lc \
   'cd /workspace && python -m spark_jobs.call_api_with_gold_sample --year 2024 --month 1 --api-url http://aviation-api:3000/predict'
 ```
 
-Optional live-weather inference:
+Live-weather inference, one snapshot:
 
 ```bash
 docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.live_weather_predict --airport JFK --api-url http://aviation-api:3000/predict'
 ```
+
+Continuous live-weather inference:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.live_weather_predict --airport JFK --watch --interval-seconds 30 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk.jsonl --api-url http://aviation-api:3000/predict'
+```
+
+For an open-ended live run, remove `--max-iterations` and stop with `Ctrl+C`.
 
 Run the required 10x stability demonstration:
 
@@ -92,9 +101,11 @@ python3 api/load_test.py --requests 100 --concurrency 10
 
 Open Grafana at <http://localhost:3001> and show:
 
-1. Prediction requests per second.
-2. Prediction latency p95.
-3. Predictions by risk band.
+1. Total prediction requests and current requests per second.
+2. Prediction errors, if any.
+3. Prediction latency p50 and p95.
+4. Risk-band split across low and high predictions.
+5. Latest disruption probability and probability trend/distribution.
 
 ## Airflow
 

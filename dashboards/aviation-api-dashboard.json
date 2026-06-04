@@ -1,31 +1,269 @@
 {
-  "annotations": {"list": []},
+  "annotations": {
+    "list": []
+  },
   "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
   "panels": [
     {
-      "title": "Prediction Requests Per Second",
-      "type": "timeseries",
-      "targets": [{"expr": "sum(rate(aviation_prediction_requests_total[1m]))", "legendFormat": "requests/s"}],
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "thresholds"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(aviation_prediction_requests_total)",
+          "legendFormat": "total"
+        }
+      ],
+      "title": "Total Prediction Requests",
+      "type": "stat"
     },
     {
-      "title": "Prediction Latency P95",
-      "type": "timeseries",
-      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(aviation_prediction_latency_seconds_bucket[1m])) by (le))", "legendFormat": "p95 seconds"}],
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "thresholds"}, "unit": "reqps"},
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(aviation_prediction_requests_total[1m]))",
+          "legendFormat": "requests/s"
+        }
+      ],
+      "title": "Current Request Rate",
+      "type": "stat"
     },
     {
-      "title": "Predictions By Risk Band",
-      "type": "timeseries",
-      "targets": [{"expr": "sum by (risk_band) (aviation_prediction_requests_total)", "legendFormat": "{{risk_band}}"}],
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "thresholds"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(aviation_prediction_errors_total)",
+          "legendFormat": "errors"
+        }
+      ],
+      "title": "Prediction Errors",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.4},
+              {"color": "red", "value": 0.5}
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "max(aviation_latest_disruption_probability)",
+          "legendFormat": "latest"
+        }
+      ],
+      "title": "Latest Disruption Probability",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "reqps"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "id": 5,
+      "options": {
+        "legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (risk_band) (rate(aviation_prediction_requests_total[1m]))",
+          "legendFormat": "{{risk_band}}"
+        }
+      ],
+      "title": "Prediction Requests By Risk Band",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "s"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "id": 6,
+      "options": {
+        "legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.50, sum(rate(aviation_prediction_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum(rate(aviation_prediction_latency_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "title": "Prediction Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 13},
+      "id": 7,
+      "options": {
+        "displayLabels": ["name", "percent"],
+        "legend": {"displayMode": "list", "placement": "right", "showLegend": true},
+        "pieType": "pie",
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "tooltip": {"mode": "single", "sort": "none"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (risk_band) (aviation_prediction_requests_total)",
+          "legendFormat": "{{risk_band}}"
+        }
+      ],
+      "title": "Cumulative Risk Split",
+      "type": "piechart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "percentunit"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 13},
+      "id": 8,
+      "options": {
+        "legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(rate(aviation_disruption_probability_sum[1m])) / sum(rate(aviation_disruption_probability_count[1m]))",
+          "legendFormat": "average probability"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum(rate(aviation_disruption_probability_bucket[1m])) by (le))",
+          "legendFormat": "p95 probability"
+        }
+      ],
+      "title": "Probability Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "short"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 13},
+      "id": 9,
+      "options": {
+        "legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "targets": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum(increase(aviation_disruption_probability_bucket[15m])) by (le)",
+          "legendFormat": "<= {{le}}"
+        }
+      ],
+      "title": "Probability Distribution Last 15m",
+      "type": "barchart"
     }
   ],
+  "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["aviation", "bentoml", "prometheus"],
+  "tags": ["aviation", "bentoml", "prometheus", "live-demo"],
   "templating": {"list": []},
   "time": {"from": "now-15m", "to": "now"},
-  "title": "Aviation Disruption API",
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Aviation Disruption Live API",
   "uid": "aviation-disruption-api",
-  "version": 1
+  "version": 2,
+  "weekStart": ""
 }

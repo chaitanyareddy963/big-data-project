@@ -7,9 +7,11 @@ be transformed into the deployed model's feature contract.
 
 from __future__ import annotations
 
-import argparse
 import json
-from datetime import datetime
+import argparse
+import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 from pyspark.sql import functions as F
@@ -26,6 +28,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--airport", default="JFK", help="IATA airport code from the metadata table.")
     parser.add_argument("--distance-miles", type=float, default=1000.0)
     parser.add_argument("--api-url", default="http://localhost:3000/predict")
+    parser.add_argument(
+        "--watch",
+        action="store_true",
+        help="Continuously poll live weather and call the prediction API until stopped.",
+    )
+    parser.add_argument(
+        "--interval-seconds",
+        type=int,
+        default=300,
+        help="Polling interval for --watch mode. Open-Meteo current weather usually updates every 15 minutes.",
+    )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="Optional cap for --watch mode, useful for notebook or presentation demos.",
+    )
+    parser.add_argument(
+        "--output-jsonl",
+        default=None,
+        help="Optional local JSONL path where each live prediction event is appended.",
+    )
     return parser.parse_args()
 
 
@@ -92,19 +116,106 @@ def build_features(weather: dict, distance_miles: float) -> dict[str, float]:
     return {name: features[name] for name in NUMERIC_FEATURES}
 
 
-def main() -> None:
-    args = parse_args()
-    latitude, longitude, airport_name = airport_coordinates(args.airport)
+def predict_once(args: argparse.Namespace, latitude: float, longitude: float, airport_name: str) -> dict:
     weather = fetch_live_weather(latitude, longitude)
     features = build_features(weather, args.distance_miles)
     response = requests.post(args.api_url, json={"features": features}, timeout=15)
     response.raise_for_status()
-    print("Live airport:", json.dumps({"iata": args.airport.upper(), "name": airport_name, "latitude": latitude, "longitude": longitude}))
-    print("Open-Meteo current:", json.dumps(weather["current"], indent=2))
-    print("Prediction features:", json.dumps(features, indent=2))
-    print("API response:", json.dumps(response.json(), indent=2))
+    return {
+        "event_time_utc": datetime.now(timezone.utc).isoformat(),
+        "airport": {
+            "iata": args.airport.upper(),
+            "name": airport_name,
+            "latitude": latitude,
+            "longitude": longitude,
+        },
+        "open_meteo_current": weather["current"],
+        "features": features,
+        "api_response": response.json(),
+    }
+
+
+def append_jsonl(path: str | None, event: dict) -> Path | None:
+    if not path:
+        return None
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(event, sort_keys=True) + "\n")
+    return output_path
+
+
+def print_event(event: dict) -> None:
+    print("Live airport:", json.dumps(event["airport"]))
+    print("Open-Meteo current:", json.dumps(event["open_meteo_current"], indent=2))
+    print("Prediction features:", json.dumps(event["features"], indent=2))
+    print("API response:", json.dumps(event["api_response"], indent=2))
+
+
+def print_watch_event(iteration: int, event: dict) -> None:
+    response = event["api_response"]
+    current = event["open_meteo_current"]
+    print(
+        json.dumps(
+            {
+                "iteration": iteration,
+                "event_time_utc": event["event_time_utc"],
+                "airport": event["airport"]["iata"],
+                "weather_time": current.get("time"),
+                "temperature_c": current.get("temperature_2m"),
+                "precipitation_mm": current.get("precipitation"),
+                "wind_speed_kts": current.get("wind_speed_10m"),
+                "prediction": response.get("prediction"),
+                "disruption_probability": response.get("disruption_probability"),
+                "risk_band": response.get("risk_band"),
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+
+def run_watch(args: argparse.Namespace, latitude: float, longitude: float, airport_name: str) -> None:
+    if args.interval_seconds < 1:
+        raise ValueError("--interval-seconds must be at least 1")
+
+    iteration = 0
+    print(
+        f"Starting continuous live prediction for {args.airport.upper()} "
+        f"every {args.interval_seconds}s. Press Ctrl+C to stop.",
+        flush=True,
+    )
+    if args.output_jsonl:
+        print(f"Appending live prediction events to {args.output_jsonl}", flush=True)
+    try:
+        while args.max_iterations is None or iteration < args.max_iterations:
+            iteration += 1
+            event = predict_once(args, latitude, longitude, airport_name)
+            written_path = append_jsonl(args.output_jsonl, event)
+            print_watch_event(iteration, event)
+            if written_path:
+                print(f"written_jsonl={written_path.resolve()}", flush=True)
+
+            if args.max_iterations is not None and iteration >= args.max_iterations:
+                break
+            time.sleep(args.interval_seconds)
+    except KeyboardInterrupt:
+        print("\nStopped continuous live prediction.", flush=True)
+
+
+def main() -> None:
+    args = parse_args()
+    if args.output_jsonl:
+        args.output_jsonl = str(Path(args.output_jsonl).expanduser().resolve())
+    latitude, longitude, airport_name = airport_coordinates(args.airport)
+    if args.watch:
+        run_watch(args, latitude, longitude, airport_name)
+        return
+
+    event = predict_once(args, latitude, longitude, airport_name)
+    append_jsonl(args.output_jsonl, event)
+    print_event(event)
 
 
 if __name__ == "__main__":
     main()
-
