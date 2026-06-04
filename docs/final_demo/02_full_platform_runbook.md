@@ -91,6 +91,32 @@ docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.live_weather_predict --airport JFK --watch --interval-seconds 30 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk.jsonl --api-url http://aviation-api:3000/predict'
 ```
 
+Recommended live operational inference using AviationWeather.gov and
+AeroDataBox:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.live_operational_predict --airport JFK --watch --interval-seconds 60 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk_operational.jsonl --api-url http://aviation-api:3000/predict'
+```
+
+Configure AeroDataBox in `.env` before running the operational demo:
+
+```bash
+AERODATABOX_MARKETPLACE=rapidapi
+AERODATABOX_API_KEY=your_key_here
+AERODATABOX_RAPIDAPI_HOST=aerodatabox.p.rapidapi.com
+```
+
+For API.Market, use:
+
+```bash
+AERODATABOX_MARKETPLACE=apimarket
+AERODATABOX_API_KEY=your_key_here
+```
+
+If the key is missing, the command still fetches AviationWeather.gov METAR
+weather and marks AeroDataBox operations as unavailable.
+
 For an open-ended live run, remove `--max-iterations` and stop with `Ctrl+C`.
 
 Run the required 10x stability demonstration:

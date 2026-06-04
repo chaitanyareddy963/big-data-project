@@ -195,6 +195,9 @@ Additional components:
 - `api/live_weather_predict.py`: live Open-Meteo inference demo. It can run
   once or continuously poll current airport weather and score every snapshot
   through the deployed API.
+- `api/live_operational_predict.py`: recommended live final demo path. It
+  combines AviationWeather.gov METAR observations with AeroDataBox airport
+  arrivals/departures, scores the deployed model, and logs each live event.
 - `spark_jobs/call_api_with_gold_sample.py`: calls the deployed API using a
   real row from the Gold feature table.
 - `dashboards/`: Prometheus scrape configuration and provisioned Grafana
@@ -211,12 +214,16 @@ docker compose exec jupyter bash -lc \
   'cd /workspace && python -m spark_jobs.call_api_with_gold_sample --year 2024 --month 1 --api-url http://aviation-api:3000/predict'
 docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.live_weather_predict --airport JFK --watch --interval-seconds 30 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk.jsonl --api-url http://aviation-api:3000/predict'
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.live_operational_predict --airport JFK --watch --interval-seconds 60 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk_operational.jsonl --api-url http://aviation-api:3000/predict'
 python3 api/load_test.py --requests 100 --concurrency 10
 ```
 
 For a continuous live run, omit `--max-iterations` and stop it with
 `Ctrl+C`. Open Grafana at <http://localhost:3001> while the live loop or load
-test is running.
+test is running. AeroDataBox requires `AERODATABOX_API_KEY` in `.env`; without
+that key, `live_operational_predict.py` still fetches AviationWeather.gov METAR
+weather and clearly marks flight operations as unavailable in the JSON output.
 
 See `docs/final_demo/02_full_platform_runbook.md` and
 `notebooks/final/08_full_platform_demo.ipynb`. For the larger final proof, see
