@@ -77,11 +77,11 @@
       },
       "targets": [
         {
-          "expr": "sum(aviation_prediction_errors_total)",
-          "legendFormat": "errors"
+          "expr": "sum(bentoml_service_request_total{http_response_code!=\"200\"})",
+          "legendFormat": "non-200"
         }
       ],
-      "title": "Prediction Errors",
+      "title": "Failed API Requests",
       "type": "stat"
     },
     {
