@@ -76,6 +76,80 @@ docker compose ps
 Copy `.env.example` to `.env`, replace placeholder secrets, and keep `.env`
 untracked.
 
+## Fresh Clone Setup
+
+This repository does **not** contain the large datasets, MinIO volumes, trained
+model JSON, or secret API keys. A new user must restore or regenerate data
+before running the PR2/final notebooks.
+
+Minimum practical VM:
+
+```text
+Disk: 220 GiB recommended for one-year proof with raw + lakehouse copies
+Memory: 16 GiB recommended
+Docker + Docker Compose required
+```
+
+Clone and configure:
+
+```bash
+git clone <repo-url>
+cd big-data-project
+cp .env.example .env
+```
+
+Edit `.env` and set at least:
+
+```bash
+MINIO_ROOT_USER=...
+MINIO_ROOT_PASSWORD=...
+AWS_ACCESS_KEY_ID=<same as MINIO_ROOT_USER>
+AWS_SECRET_ACCESS_KEY=<same as MINIO_ROOT_PASSWORD>
+JUPYTER_TOKEN=...
+HOST_UID=$(id -u)
+HOST_GID=$(id -g)
+```
+
+Optional live-demo keys:
+
+```bash
+AERODATABOX_API_KEY=...
+GROQ_API_KEY=...
+```
+
+Start storage and core services:
+
+```bash
+docker compose up -d minio mc kafka kafka-ui spark-master spark-worker jupyter mlflow
+```
+
+Then restore datasets into MinIO at these exact paths:
+
+```text
+raw/arco_era5_us_airport_hourly/
+raw/bts_on_time/raw_zip/
+raw/metadata/
+```
+
+See the complete data restoration guide:
+
+```text
+docs/setup_dataset.md
+```
+
+After data is restored, verify and build the one-year proof:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m spark_jobs.run_year_pipeline --year 2024 --with-delta --with-final-model'
+```
+
+Run the final notebook demo:
+
+```text
+notebooks/final/10_live_and_simulation_demo.ipynb
+```
+
 ## Notebook Presentation Flow
 
 The notebooks are the live presentation layer. They show important code,

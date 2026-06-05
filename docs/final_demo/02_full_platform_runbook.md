@@ -1,5 +1,9 @@
 # Final Live Demo Runbook
 
+For a fresh clone or new VM, restore raw datasets first using
+`docs/setup_dataset.md`. The final notebooks assume MinIO already contains
+ARCO-ERA5, BTS ZIP archives, and metadata under the expected `raw/` paths.
+
 ## Start Services
 
 ```bash
