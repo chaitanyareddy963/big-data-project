@@ -62,6 +62,7 @@ and disk budget are available.
 | MLflow | Experiment tracking | http://localhost:5000 |
 | Airflow | Scheduled pipeline orchestration | http://localhost:8088 |
 | BentoML API | Disruption prediction endpoint | http://localhost:3000 |
+| LLM Chat UI | Groq/Llama operations assistant | http://localhost:7860 |
 | Prometheus | API metrics collection | http://localhost:9090 |
 | Grafana | Live monitoring dashboard | http://localhost:3001 |
 
@@ -204,6 +205,8 @@ Additional components:
 - `api/llm_ops_assistant.py`: optional Groq/Llama 3.3 70B assistant that
   answers demo questions using latest live events, simulation events, and
   Prometheus metrics as context.
+- `api/llm_chat_ui.py`: browser chatbot UI for the same assistant, exposed by
+  Docker Compose at <http://localhost:7860>.
 - `spark_jobs/call_api_with_gold_sample.py`: calls the deployed API using a
   real row from the Gold feature table.
 - `dashboards/`: Prometheus scrape configuration and provisioned Grafana
@@ -225,6 +228,7 @@ docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.simulate_gold_stream_predict --year 2024 --month 1 --limit 100 --delay-seconds 0.1 --output-jsonl data/local_cache/live_predictions/gold_simulation.jsonl --api-url http://aviation-api:3000/predict'
 docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.llm_ops_assistant --prometheus-url http://prometheus:9090 --question "What is happening in the live demo right now?"'
+docker compose up -d llm-chat
 python3 api/load_test.py --requests 100 --concurrency 10
 ```
 
@@ -237,6 +241,7 @@ The dataset simulation dashboard appears in Grafana as
 `Aviation Dataset Simulation Stream`.
 The LLM assistant requires `GROQ_API_KEY` in `.env`; without it, the command
 prints a local fallback summary so the notebook remains runnable.
+The browser chatbot is available at <http://localhost:7860>.
 
 See `docs/final_demo/02_full_platform_runbook.md` and
 `notebooks/final/08_full_platform_demo.ipynb`. For the larger final proof, see

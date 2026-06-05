@@ -194,6 +194,34 @@ services:
     networks:
       - aviation-net
 
+  llm-chat:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: aviation-llm-chat
+    command:
+      - python
+      - -m
+      - api.llm_chat_ui
+      - --host
+      - 0.0.0.0
+      - --port
+      - "7860"
+      - --prometheus-url
+      - http://prometheus:9090
+    env_file:
+      - .env
+    environment:
+      PROMETHEUS_URL: http://prometheus:9090
+    volumes:
+      - ./data/local_cache/live_predictions:/workspace/data/local_cache/live_predictions:ro
+    ports:
+      - "7860:7860"
+    depends_on:
+      - prometheus
+    networks:
+      - aviation-net
+
   prometheus:
     image: prom/prometheus:v3.5.0
     container_name: aviation-prometheus

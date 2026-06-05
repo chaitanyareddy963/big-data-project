@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
 WORKDIR /app
-RUN pip install --no-cache-dir bentoml==1.4.32 prometheus-client
+RUN pip install --no-cache-dir bentoml==1.4.32 prometheus-client requests
 COPY api /app/api
 ENV PYTHONPATH=/app
 EXPOSE 3000

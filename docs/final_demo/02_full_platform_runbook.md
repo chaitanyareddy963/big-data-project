@@ -163,6 +163,19 @@ docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.llm_ops_assistant --prometheus-url http://prometheus:9090 --question "Explain what is happening in this aviation demo right now."'
 ```
 
+Start the browser chatbot:
+
+```bash
+docker compose up -d llm-chat
+```
+
+Open <http://localhost:7860> and ask:
+
+- `Summarize what is happening right now.`
+- `Why do we have both external live data and dataset simulation?`
+- `Are AeroDataBox flight counts used directly by the model?`
+- `What should I show in Grafana for final presentation?`
+
 If `GROQ_API_KEY` is missing, the assistant returns a local fallback summary
 instead of failing.
 
