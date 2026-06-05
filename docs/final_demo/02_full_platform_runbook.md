@@ -143,6 +143,29 @@ Open Kafka UI at <http://localhost:8085> and show topic
 `simulation.prediction.requests`. Open Grafana and show dashboard
 `Aviation Dataset Simulation Stream`.
 
+## LLM Operations Assistant
+
+The optional LLM layer uses Groq's OpenAI-compatible chat completions API with
+Llama 3.3 70B. It answers questions from the latest JSONL live evidence and
+Prometheus metrics.
+
+Configure `.env`:
+
+```bash
+GROQ_API_KEY=your_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+Run:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.llm_ops_assistant --prometheus-url http://prometheus:9090 --question "Explain what is happening in this aviation demo right now."'
+```
+
+If `GROQ_API_KEY` is missing, the assistant returns a local fallback summary
+instead of failing.
+
 Run the required 10x stability demonstration:
 
 ```bash
