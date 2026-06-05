@@ -198,11 +198,13 @@ Additional components:
 - `api/live_operational_predict.py`: recommended live final demo path. It
   combines AviationWeather.gov METAR observations with AeroDataBox airport
   arrivals/departures, scores the deployed model, and logs each live event.
+- `api/simulate_gold_stream_predict.py`: replays real Gold feature rows as a
+  simulated live stream, publishes each event to Kafka, calls the deployed API,
+  and logs prediction evidence.
 - `spark_jobs/call_api_with_gold_sample.py`: calls the deployed API using a
   real row from the Gold feature table.
 - `dashboards/`: Prometheus scrape configuration and provisioned Grafana
-  dashboard for request volume, latency, errors, risk-band split, and
-  probability distribution.
+  dashboards for external live API traffic and dataset simulation replay.
 - `tests/`: focused tests for BTS archive validation and API scoring.
 
 Run the full final demonstration using:
@@ -216,6 +218,8 @@ docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.live_weather_predict --airport JFK --watch --interval-seconds 30 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk.jsonl --api-url http://aviation-api:3000/predict'
 docker compose exec jupyter bash -lc \
   'cd /workspace && python -m api.live_operational_predict --airport JFK --watch --interval-seconds 60 --max-iterations 10 --output-jsonl data/local_cache/live_predictions/jfk_operational.jsonl --api-url http://aviation-api:3000/predict'
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.simulate_gold_stream_predict --year 2024 --month 1 --limit 100 --delay-seconds 0.1 --output-jsonl data/local_cache/live_predictions/gold_simulation.jsonl --api-url http://aviation-api:3000/predict'
 python3 api/load_test.py --requests 100 --concurrency 10
 ```
 
@@ -224,6 +228,8 @@ For a continuous live run, omit `--max-iterations` and stop it with
 test is running. AeroDataBox requires `AERODATABOX_API_KEY` in `.env`; without
 that key, `live_operational_predict.py` still fetches AviationWeather.gov METAR
 weather and clearly marks flight operations as unavailable in the JSON output.
+The dataset simulation dashboard appears in Grafana as
+`Aviation Dataset Simulation Stream`.
 
 See `docs/final_demo/02_full_platform_runbook.md` and
 `notebooks/final/08_full_platform_demo.ipynb`. For the larger final proof, see

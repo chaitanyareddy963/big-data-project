@@ -28,6 +28,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--airport", default="JFK", help="IATA airport code from the metadata table.")
     parser.add_argument("--distance-miles", type=float, default=1000.0)
     parser.add_argument("--api-url", default="http://localhost:3000/predict")
+    parser.add_argument("--source", default="external_live_weather")
     parser.add_argument(
         "--watch",
         action="store_true",
@@ -119,7 +120,7 @@ def build_features(weather: dict, distance_miles: float) -> dict[str, float]:
 def predict_once(args: argparse.Namespace, latitude: float, longitude: float, airport_name: str) -> dict:
     weather = fetch_live_weather(latitude, longitude)
     features = build_features(weather, args.distance_miles)
-    response = requests.post(args.api_url, json={"features": features}, timeout=15)
+    response = requests.post(args.api_url, json={"features": features, "source": args.source}, timeout=15)
     response.raise_for_status()
     return {
         "event_time_utc": datetime.now(timezone.utc).isoformat(),

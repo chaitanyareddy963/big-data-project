@@ -119,6 +119,30 @@ weather and marks AeroDataBox operations as unavailable.
 
 For an open-ended live run, remove `--max-iterations` and stop with `Ctrl+C`.
 
+## Dataset Simulation Stream
+
+This replay demonstrates that if live records arrive with the same feature
+contract as the historical Gold training table, the platform can stream and
+score them continuously. The script reads real Gold feature rows, publishes
+each event to Kafka topic `simulation.prediction.requests`, calls the deployed
+API, and writes JSONL evidence.
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.simulate_gold_stream_predict --year 2024 --month 1 --limit 100 --delay-seconds 0.1 --output-jsonl data/local_cache/live_predictions/gold_simulation.jsonl --api-url http://aviation-api:3000/predict'
+```
+
+For a slower visual demo:
+
+```bash
+docker compose exec jupyter bash -lc \
+  'cd /workspace && python -m api.simulate_gold_stream_predict --year 2024 --month 1 --limit 25 --delay-seconds 1 --output-jsonl data/local_cache/live_predictions/gold_simulation_slow.jsonl --api-url http://aviation-api:3000/predict'
+```
+
+Open Kafka UI at <http://localhost:8085> and show topic
+`simulation.prediction.requests`. Open Grafana and show dashboard
+`Aviation Dataset Simulation Stream`.
+
 Run the required 10x stability demonstration:
 
 ```bash
@@ -128,10 +152,11 @@ python3 api/load_test.py --requests 100 --concurrency 10
 Open Grafana at <http://localhost:3001> and show:
 
 1. Total prediction requests and current requests per second.
-2. Prediction errors, if any.
+2. Failed API requests, if any.
 3. Prediction latency p50 and p95.
 4. Risk-band split across low and high predictions.
 5. Latest disruption probability and probability trend/distribution.
+6. Dataset simulation stream rate and simulated risk-band split.
 
 ## Airflow
 

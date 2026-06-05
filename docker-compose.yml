@@ -217,6 +217,7 @@ services:
       - grafana-data:/var/lib/grafana
       - ./dashboards/provisioning:/etc/grafana/provisioning:ro
       - ./dashboards/aviation-api-dashboard.json:/var/lib/grafana/dashboards/aviation-api-dashboard.json:ro
+      - ./dashboards/simulation-stream-dashboard.json:/var/lib/grafana/dashboards/simulation-stream-dashboard.json:ro
     ports:
       - "3001:3000"
     depends_on:

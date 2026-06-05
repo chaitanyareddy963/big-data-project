@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--airport", default="JFK", help="IATA airport code, for example JFK or ATL.")
     parser.add_argument("--distance-miles", type=float, default=1000.0)
     parser.add_argument("--api-url", default="http://localhost:3000/predict")
+    parser.add_argument("--source", default="external_live_operational")
     parser.add_argument("--watch", action="store_true", help="Continuously poll live data until stopped.")
     parser.add_argument("--interval-seconds", type=int, default=300)
     parser.add_argument("--max-iterations", type=int, default=None)
@@ -257,8 +258,8 @@ def build_features_from_metar(metar: dict[str, Any], distance_miles: float) -> d
     return {name: features[name] for name in NUMERIC_FEATURES}
 
 
-def call_prediction_api(api_url: str, features: dict[str, float]) -> dict[str, Any]:
-    response = requests.post(api_url, json={"features": features}, timeout=15)
+def call_prediction_api(api_url: str, features: dict[str, float], source: str) -> dict[str, Any]:
+    response = requests.post(api_url, json={"features": features, "source": source}, timeout=15)
     response.raise_for_status()
     return response.json()
 
@@ -281,7 +282,7 @@ def predict_once(args: argparse.Namespace, airport: dict[str, Any]) -> dict[str,
         duration_minutes=args.flight_window_duration_minutes,
     )
     features = build_features_from_metar(metar, args.distance_miles)
-    prediction = call_prediction_api(args.api_url, features)
+    prediction = call_prediction_api(args.api_url, features, args.source)
     return {
         "event_time_utc": datetime.now(timezone.utc).isoformat(),
         "airport": airport,
