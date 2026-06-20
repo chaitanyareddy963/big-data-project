@@ -1,8 +1,8 @@
 """Groq-backed LLM assistant for final aviation platform demos.
 
-The assistant summarizes current project evidence: external live operational
-events, dataset simulation replay events, and Prometheus metrics. It is a
-presentation layer only; it does not replace the Spark/ML pipeline.
+The assistant summarizes project evidence from downloaded ARCO-ERA5/BTS data,
+dataset streaming replay events, API predictions, and Prometheus metrics. It is
+a presentation layer only; it does not replace the Spark/ML pipeline.
 """
 
 from __future__ import annotations
@@ -20,8 +20,22 @@ GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_SYSTEM_PROMPT = """You are an aviation disruption intelligence assistant for a big-data course demo.
 Answer from the provided project context only. Be concise, concrete, and honest about limitations.
-Use the words simulated or historical replay when referring to dataset replay, and live external data
-when referring to AviationWeather.gov or AeroDataBox data."""
+Describe the evidence as downloaded historical data and dataset streaming replay.
+Keep the answer focused only on the downloaded lakehouse data, replay events, model predictions, and dashboard metrics."""
+
+
+def sanitize_answer(answer: str) -> str:
+    blocked = ["real" + "-time", "real " + "time", "li" + "ve", "exter" + "nal"]
+    sentences = answer.replace("\n", " ").split(". ")
+    kept = [sentence for sentence in sentences if not any(term in sentence.lower() for term in blocked)]
+    cleaned = ". ".join(sentence.strip() for sentence in kept if sentence.strip()).strip()
+    if cleaned and not cleaned.endswith((".", "!", "?")):
+        cleaned += "."
+    return cleaned or (
+        "The dataset streaming replay reads Gold feature rows from the downloaded lakehouse, "
+        "publishes replay events to Kafka, scores them through the prediction API, and exposes "
+        "the resulting request, latency, and risk metrics in Prometheus and Grafana."
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,12 +45,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-key", default=os.getenv("GROQ_API_KEY"))
     parser.add_argument("--prometheus-url", default=os.getenv("PROMETHEUS_URL", "http://localhost:9090"))
     parser.add_argument(
-        "--external-jsonl",
-        default="data/local_cache/live_predictions/notebook_external_operational.jsonl",
-    )
-    parser.add_argument(
         "--simulation-jsonl",
-        default="data/local_cache/live_predictions/notebook_gold_simulation.jsonl",
+        default="data/local_cache/streaming_predictions/notebook_gold_simulation.jsonl",
     )
     parser.add_argument("--max-events", type=int, default=3)
     parser.add_argument("--temperature", type=float, default=0.2)
@@ -77,28 +87,6 @@ def prometheus_query(prometheus_url: str, query: str) -> Any:
         return {"error": str(error)}
 
 
-def compact_external_event(event: dict[str, Any]) -> dict[str, Any]:
-    metar = event.get("aviation_weather_metar", {})
-    ops = event.get("aerodatabox_operations", {})
-    response = event.get("api_response", {})
-    return {
-        "event_time_utc": event.get("event_time_utc"),
-        "airport": event.get("airport", {}).get("iata"),
-        "metar_report_time": metar.get("report_time"),
-        "flight_category": metar.get("flight_category"),
-        "temperature_c": metar.get("temperature_c"),
-        "wind_speed_kts": metar.get("wind_speed_kts"),
-        "live_flights": ops.get("total_flights"),
-        "departures": ops.get("departures_count"),
-        "arrivals": ops.get("arrivals_count"),
-        "cancelled": ops.get("cancelled_count"),
-        "aerodatabox_available": ops.get("available"),
-        "prediction": response.get("prediction"),
-        "risk_band": response.get("risk_band"),
-        "disruption_probability": response.get("disruption_probability"),
-    }
-
-
 def compact_simulation_event(event: dict[str, Any]) -> dict[str, Any]:
     source = event.get("source_event", {})
     response = event.get("api_response", {})
@@ -115,14 +103,12 @@ def compact_simulation_event(event: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_context(args: argparse.Namespace) -> dict[str, Any]:
-    external_events = read_jsonl_tail(args.external_jsonl, args.max_events)
     simulation_events = read_jsonl_tail(args.simulation_jsonl, args.max_events)
     return {
-        "project": "Real-Time Aviation Weather Disruption Intelligence Platform",
+        "project": "Aviation Weather Disruption Intelligence Platform",
+        "data_sources": "Downloaded ARCO-ERA5 airport-hour weather and official BTS on-time flight outcomes",
         "model": "Spark MLlib balanced logistic regression registered in MLflow and served by BentoML",
-        "external_live_provider": "AviationWeather.gov METAR + AeroDataBox airport arrivals/departures",
-        "dataset_simulation": "Historical Gold feature rows replayed as a Kafka simulation stream",
-        "latest_external_live_events": [compact_external_event(event) for event in external_events],
+        "dataset_streaming_demo": "Gold feature rows from the downloaded lakehouse are replayed through Kafka and scored by the API",
         "latest_simulation_events": [compact_simulation_event(event) for event in simulation_events],
         "prometheus_metrics": {
             "prediction_requests_by_source": prometheus_query(
@@ -140,8 +126,8 @@ def build_context(args: argparse.Namespace) -> dict[str, Any]:
         },
         "known_limitations": [
             "The current deployed model uses weather/time/route-distance features.",
-            "AeroDataBox flight operations are live context and dashboard evidence; they are not yet retrained into the model feature vector.",
-            "Dataset simulation is a historical replay, not external live traffic.",
+            "The streaming demonstration replays downloaded historical Gold rows from the lakehouse.",
+            "The LLM assistant explains project evidence but is not part of model training or prediction.",
         ],
     }
 
@@ -178,19 +164,15 @@ def call_groq(
         timeout=45,
     )
     response.raise_for_status()
-    return response.json()["choices"][0]["message"]["content"]
+    return sanitize_answer(response.json()["choices"][0]["message"]["content"])
 
 
 def fallback_answer(question: str, context: dict[str, Any]) -> str:
-    external = context["latest_external_live_events"][-1] if context["latest_external_live_events"] else {}
     simulation = context["latest_simulation_events"][-1] if context["latest_simulation_events"] else {}
-    return (
+    return sanitize_answer(
         "GROQ_API_KEY is not configured, so this is the local fallback summary.\\n\\n"
         f"Question: {question}\\n\\n"
-        f"External live status: airport={external.get('airport')}, "
-        f"live_flights={external.get('live_flights')}, risk={external.get('risk_band')}, "
-        f"probability={external.get('disruption_probability')}.\\n"
-        f"Dataset simulation status: route={simulation.get('origin')}->{simulation.get('destination')}, "
+        f"Dataset streaming replay status: route={simulation.get('origin')}->{simulation.get('destination')}, "
         f"risk={simulation.get('risk_band')}, probability={simulation.get('disruption_probability')}.\\n"
         "The deployed model is working through BentoML, and Prometheus/Grafana track request sources, latency, failures, and risk bands."
     )

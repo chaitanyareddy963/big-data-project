@@ -1,6 +1,6 @@
 # Notebook Demo Flow
 
-The notebooks are the live presentation layer. They intentionally show the
+The notebooks are the presentation layer. They intentionally show the
 important transformations, checks, schemas, previews, and conclusions cell by
 cell. Reusable production Spark implementations remain in `spark_jobs/` because
 the course rubric requires production `.py` jobs in addition to notebooks.
@@ -41,7 +41,9 @@ After PR1 and PR2, run:
 
 1. `final/08_full_platform_demo.ipynb`
 2. `final/09_one_year_real_data_pipeline.ipynb`
+3. `final/10_dataset_streaming_demo.ipynb`
 
 These notebooks present Delta Lake, Structured Streaming, Airflow, MLflow
 registry, BentoML API serving, Prometheus, Grafana, tests, load testing, the
-one-year production runner, and API prediction from a real Gold feature row.
+one-year production runner, API prediction from a real Gold feature row, and
+dataset streaming replay through Kafka.

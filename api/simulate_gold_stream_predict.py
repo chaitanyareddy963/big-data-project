@@ -1,10 +1,10 @@
-"""Replay real Gold feature rows as a simulated live prediction stream.
+"""Replay real Gold feature rows as a streaming prediction simulation.
 
-This script is for the final demonstration. It proves that if live records
-arrive in the same feature contract as the trained lakehouse dataset, the
-deployed API can continuously score them. Each event is also sent to Kafka so
-the demo has a visible streaming component, and each prediction is logged to
-JSONL for auditability.
+This script is for the final demonstration. It proves that held-out or selected
+Gold feature rows from the downloaded lakehouse dataset can be replayed through
+Kafka and scored by the deployed API. Each event is also sent to Kafka so the
+demo has a visible streaming component, and each prediction is logged to JSONL
+for auditability.
 """
 
 from __future__ import annotations

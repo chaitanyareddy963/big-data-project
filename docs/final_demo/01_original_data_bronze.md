@@ -31,7 +31,7 @@ Gold training features: 543,121 rows
 
 ## Presentation Design
 
-- Phase 1 notebooks show original-data inventory and a live bounded Kafka replay.
+- Phase 1 notebooks show original-data inventory and a bounded Kafka replay.
 - Phase 2 notebooks show Spark S3A reads, transformations, schemas, previews,
   validations, charts, MLlib diagnostics, and MLflow logging.
 - Reusable production Spark code remains in `spark_jobs/` because `.py` batch

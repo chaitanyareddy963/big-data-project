@@ -27,6 +27,6 @@ The old 72-row JFK review fixture is no longer the presentation source.
 
 - MinIO contains the original 2015-2024 ARCO-ERA5 dataset.
 - Kafka replay records are selected from an original monthly Parquet partition.
-- The consumer stores live JSONL micro-batches in MinIO.
+- The consumer stores replay JSONL micro-batches in MinIO.
 - The validation notebook reports row count, airport count, timestamp range,
   and stored object count for the latest replay.

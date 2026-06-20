@@ -214,7 +214,7 @@ services:
     environment:
       PROMETHEUS_URL: http://prometheus:9090
     volumes:
-      - ./data/local_cache/live_predictions:/workspace/data/local_cache/live_predictions:ro
+      - ./data/local_cache/streaming_predictions:/workspace/data/local_cache/streaming_predictions:ro
     ports:
       - "7860:7860"
     depends_on:

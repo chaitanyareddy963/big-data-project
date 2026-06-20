@@ -46,7 +46,7 @@ HTML = """<!doctype html>
 <body>
   <header>
     <h1>Aviation LLM Operations Assistant</h1>
-    <p>Ask questions about live AeroDataBox/METAR data, dataset simulation replay, API predictions, Prometheus metrics, and demo limitations.</p>
+    <p>Ask questions about downloaded ARCO-ERA5/BTS data, dataset streaming replay, API predictions, Prometheus metrics, and demo limitations.</p>
   </header>
   <main class="grid">
     <section class="panel">
@@ -57,15 +57,15 @@ HTML = """<!doctype html>
         </div>
       </div>
       <form id="form">
-        <input id="question" autocomplete="off" placeholder="Example: Why do we have both live data and dataset simulation?" />
+        <input id="question" autocomplete="off" placeholder="Example: How does the dataset streaming replay prove the API works?" />
         <button id="send" type="submit">Ask</button>
       </form>
     </section>
     <aside class="panel">
       <h2>Demo Questions</h2>
       <button class="quick">Summarize what is happening right now.</button>
-      <button class="quick">Why do we have both external live data and dataset simulation?</button>
-      <button class="quick">Are AeroDataBox flight counts used directly by the model?</button>
+      <button class="quick">How does the dataset streaming replay work?</button>
+      <button class="quick">Which downloaded datasets are used by the model?</button>
       <button class="quick">What should I show in Grafana for final presentation?</button>
       <button class="quick">Explain the current risk prediction and limitations.</button>
       <div class="status" id="status">Checking assistant status...</div>
@@ -131,8 +131,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument("--prometheus-url", default="http://prometheus:9090")
-    parser.add_argument("--external-jsonl", default="/workspace/data/local_cache/live_predictions/notebook_external_operational.jsonl")
-    parser.add_argument("--simulation-jsonl", default="/workspace/data/local_cache/live_predictions/notebook_gold_simulation.jsonl")
+    parser.add_argument("--simulation-jsonl", default="/workspace/data/local_cache/streaming_predictions/notebook_gold_simulation.jsonl")
     return parser.parse_args()
 
 
@@ -142,7 +141,6 @@ def make_assistant_args(server_args: argparse.Namespace, question: str) -> Simpl
         model=DEFAULT_MODEL,
         api_key=None,
         prometheus_url=server_args.prometheus_url,
-        external_jsonl=server_args.external_jsonl,
         simulation_jsonl=server_args.simulation_jsonl,
         max_events=3,
         temperature=0.2,
