@@ -1,10 +1,11 @@
-"""Replay real Gold feature rows as a streaming prediction simulation.
+"""Replay historical Gold feature rows as a dataset-only simulation.
 
 This script is for the final demonstration. It proves that held-out or selected
-Gold feature rows from the downloaded lakehouse dataset can be replayed through
-Kafka and scored by the deployed API. Each event is also sent to Kafka so the
-demo has a visible streaming component, and each prediction is logged to JSONL
-for auditability.
+Gold feature rows from the downloaded lakehouse dataset can be used in a
+streaming-style test-set replay. Each replay event is published to Kafka for
+streaming evidence. The script also calls the deployed API directly for scoring
+and logs each prediction to JSONL for auditability. The API does not consume
+from Kafka in this demo.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topic", default=DEFAULT_TOPIC)
     parser.add_argument("--output-jsonl", default=None)
     parser.add_argument("--source", default="dataset_simulation")
-    parser.add_argument("--no-kafka", action="store_true", help="Call the API but skip Kafka publishing.")
+    parser.add_argument("--no-kafka", action="store_true", help="Call the API but skip Kafka replay publishing.")
     return parser.parse_args()
 
 
@@ -136,8 +137,9 @@ def main() -> None:
 
     producer = None if args.no_kafka else create_producer(args.kafka_bootstrap)
     print(
-        f"Replaying {len(rows)} Gold rows from {gold_uri(args.year, args.month)} "
-        f"to API {args.api_url} and Kafka topic {args.topic if producer else '[disabled]'}",
+        f"Replaying {len(rows)} historical Gold rows from {gold_uri(args.year, args.month)}. "
+        f"Kafka evidence topic={args.topic if producer else '[disabled]'}; "
+        f"API scoring endpoint={args.api_url}",
         flush=True,
     )
     if args.output_jsonl:

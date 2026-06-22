@@ -209,12 +209,36 @@ services:
       - "7860"
       - --prometheus-url
       - http://prometheus:9090
+      - --repo-root
+      - /workspace
+      - --mlflow-url
+      - http://mlflow:5000
+      - --airflow-url
+      - http://airflow:8080
+      - --kafka-bootstrap
+      - kafka:9092
+      - --minio-url
+      - http://minio:9000
+      - --spark-master-url
+      - http://spark-master:8080
+      - --docker-socket
+      - /var/run/docker.sock
     env_file:
       - .env
     environment:
       PROMETHEUS_URL: http://prometheus:9090
+      REPO_ROOT: /workspace
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AIRFLOW_URL: http://airflow:8080
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MINIO_ENDPOINT_INTERNAL: http://minio:9000
+      SPARK_MASTER_UI_URL: http://spark-master:8080
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      DOCKER_SOCKET: /var/run/docker.sock
     volumes:
+      - ./:/workspace:ro
       - ./data/local_cache/streaming_predictions:/workspace/data/local_cache/streaming_predictions:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "7860:7860"
     depends_on:
@@ -228,6 +252,7 @@ services:
     command: --config.file=/etc/prometheus/prometheus.yml
     volumes:
       - ./dashboards/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./dashboards/prometheus_rules.yml:/etc/prometheus/prometheus_rules.yml:ro
     ports:
       - "9090:9090"
     depends_on:
@@ -244,8 +269,7 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./dashboards/provisioning:/etc/grafana/provisioning:ro
-      - ./dashboards/aviation-api-dashboard.json:/var/lib/grafana/dashboards/aviation-api-dashboard.json:ro
-      - ./dashboards/simulation-stream-dashboard.json:/var/lib/grafana/dashboards/simulation-stream-dashboard.json:ro
+      - ./dashboards/aviation-final-demo-dashboard.json:/var/lib/grafana/dashboards/aviation-final-demo-dashboard.json:ro
     ports:
       - "3001:3000"
     depends_on:

@@ -1,4 +1,4 @@
-"""Tiny browser chat UI for the Groq operations assistant."""
+"""Tiny browser chat UI for the Gemini operations assistant."""
 
 from __future__ import annotations
 
@@ -27,7 +27,15 @@ HTML = """<!doctype html>
     .grid { display: grid; grid-template-columns: 1fr 320px; gap: 18px; }
     .panel { background: #0f1d33; border: 1px solid #24476d; border-radius: 14px; box-shadow: 0 12px 30px #0008; }
     #chat { height: 520px; overflow-y: auto; padding: 18px; }
-    .message { margin: 0 0 14px; padding: 13px 15px; border-radius: 12px; white-space: pre-wrap; line-height: 1.45; }
+    .message { margin: 0 0 14px; padding: 13px 15px; border-radius: 12px; line-height: 1.45; }
+    .message p { margin: 0 0 10px; }
+    .message p:last-child { margin-bottom: 0; }
+    .message ul, .message ol { margin: 8px 0 10px 20px; padding: 0; }
+    .message li { margin: 4px 0; }
+    .message h3 { margin: 12px 0 8px; font-size: 16px; color: #f1f6ff; }
+    .message code { background: #071324; border: 1px solid #27496f; border-radius: 5px; padding: 1px 5px; color: #d5ebff; }
+    .message pre { background: #071324; border: 1px solid #27496f; border-radius: 10px; padding: 10px; overflow-x: auto; white-space: pre; }
+    .message pre code { border: 0; padding: 0; background: transparent; }
     .user { background: #214f82; margin-left: 10%; }
     .assistant { background: #132943; margin-right: 10%; border: 1px solid #2b5a88; }
     .meta { font-size: 12px; color: #94a8c0; margin-bottom: 6px; }
@@ -46,7 +54,7 @@ HTML = """<!doctype html>
 <body>
   <header>
     <h1>Aviation LLM Operations Assistant</h1>
-    <p>Ask questions about downloaded ARCO-ERA5/BTS data, dataset streaming replay, API predictions, Prometheus metrics, and demo limitations.</p>
+    <p>Ask questions about the codebase, docs, notebooks, MLflow, Airflow, Kafka, MinIO, Spark, Grafana dashboards, service logs, replay evidence, API predictions, and demo limitations.</p>
   </header>
   <main class="grid">
     <section class="panel">
@@ -57,14 +65,17 @@ HTML = """<!doctype html>
         </div>
       </div>
       <form id="form">
-        <input id="question" autocomplete="off" placeholder="Example: How does the dataset streaming replay prove the API works?" />
+        <input id="question" autocomplete="off" placeholder="Example: Which files implement the dataset replay and API scoring path?" />
         <button id="send" type="submit">Ask</button>
       </form>
     </section>
     <aside class="panel">
       <h2>Demo Questions</h2>
       <button class="quick">Summarize what is happening right now.</button>
+      <button class="quick">Which files implement the dataset replay and API scoring path?</button>
       <button class="quick">How does the dataset streaming replay work?</button>
+      <button class="quick">What is the current status of MLflow, Kafka, MinIO, Spark, and Grafana?</button>
+      <button class="quick">Are there recent warnings or errors in the service logs?</button>
       <button class="quick">Which downloaded datasets are used by the model?</button>
       <button class="quick">What should I show in Grafana for final presentation?</button>
       <button class="quick">Explain the current risk prediction and limitations.</button>
@@ -78,10 +89,96 @@ HTML = """<!doctype html>
     const send = document.getElementById('send');
     const statusBox = document.getElementById('status');
 
-    function addMessage(role, text) {
+    function escapeHtml(text) {
+      return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    }
+
+    function renderInlineMarkdown(text) {
+      return text
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>')
+        .replace(/\\*([^*]+)\\*/g, '<em>$1</em>');
+    }
+
+    function renderMarkdown(text) {
+      const escaped = escapeHtml(text);
+      const lines = escaped.split('\\n');
+      const blocks = [];
+      let paragraph = [];
+      let listItems = [];
+      let inCode = false;
+      let codeLines = [];
+
+      function flushParagraph() {
+        if (paragraph.length) {
+          blocks.push('<p>' + renderInlineMarkdown(paragraph.join(' ')) + '</p>');
+          paragraph = [];
+        }
+      }
+      function flushList() {
+        if (listItems.length) {
+          blocks.push('<ul>' + listItems.map(item => '<li>' + renderInlineMarkdown(item) + '</li>').join('') + '</ul>');
+          listItems = [];
+        }
+      }
+
+      for (const line of lines) {
+        if (line.trim().startsWith('```')) {
+          if (inCode) {
+            blocks.push('<pre><code>' + codeLines.join('\\n') + '</code></pre>');
+            codeLines = [];
+            inCode = false;
+          } else {
+            flushParagraph();
+            flushList();
+            inCode = true;
+          }
+          continue;
+        }
+        if (inCode) {
+          codeLines.push(line);
+          continue;
+        }
+
+        const trimmed = line.trim();
+        if (!trimmed) {
+          flushParagraph();
+          flushList();
+          continue;
+        }
+        if (trimmed.startsWith('### ')) {
+          flushParagraph();
+          flushList();
+          blocks.push('<h3>' + renderInlineMarkdown(trimmed.slice(4)) + '</h3>');
+          continue;
+        }
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          flushParagraph();
+          listItems.push(trimmed.slice(2));
+          continue;
+        }
+        const numbered = trimmed.match(/^\\d+\\.\\s+(.+)$/);
+        if (numbered) {
+          flushParagraph();
+          listItems.push(numbered[1]);
+          continue;
+        }
+        flushList();
+        paragraph.push(trimmed);
+      }
+      flushParagraph();
+      flushList();
+      if (inCode) blocks.push('<pre><code>' + codeLines.join('\\n') + '</code></pre>');
+      return blocks.join('');
+    }
+
+    function addMessage(role, text, render = false) {
       const div = document.createElement('div');
       div.className = 'message ' + role;
-      div.innerHTML = '<div class="meta">' + role + '</div>' + text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+      div.innerHTML = '<div class="meta">' + role + '</div>' + (render ? renderMarkdown(text) : '<p>' + escapeHtml(text) + '</p>');
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
     }
@@ -98,9 +195,9 @@ HTML = """<!doctype html>
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Request failed');
-        addMessage('assistant', data.answer + '\\n\\n[source: ' + data.provider + ', model: ' + data.model + ']');
+        addMessage('assistant', data.answer + '\\n\\n[source: ' + data.provider + ', model: ' + data.model + ']', true);
       } catch (error) {
-        addMessage('assistant', 'Error: ' + error.message);
+        addMessage('assistant', 'Error: ' + error.message, true);
       } finally {
         send.disabled = false;
         input.focus();
@@ -116,7 +213,7 @@ HTML = """<!doctype html>
       button.addEventListener('click', () => ask(button.textContent));
     });
     fetch('/api/health').then(r => r.json()).then(data => {
-      statusBox.textContent = 'Provider: ' + data.provider + ' | Model: ' + data.model + ' | Groq key configured: ' + data.groq_key_configured;
+      statusBox.textContent = 'Provider: ' + data.provider + ' | Model: ' + data.model + ' | Gemini key configured: ' + data.gemini_key_configured;
     }).catch(error => {
       statusBox.textContent = 'Health check failed: ' + error.message;
     });
@@ -131,6 +228,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=7860)
     parser.add_argument("--prometheus-url", default="http://prometheus:9090")
+    parser.add_argument("--repo-root", default="/workspace")
+    parser.add_argument("--mlflow-url", default="http://mlflow:5000")
+    parser.add_argument("--airflow-url", default="http://airflow:8080")
+    parser.add_argument("--kafka-bootstrap", default="kafka:9092")
+    parser.add_argument("--minio-url", default="http://minio:9000")
+    parser.add_argument("--spark-master-url", default="http://spark-master:8080")
+    parser.add_argument("--docker-socket", default="/var/run/docker.sock")
     parser.add_argument("--simulation-jsonl", default="/workspace/data/local_cache/streaming_predictions/notebook_gold_simulation.jsonl")
     return parser.parse_args()
 
@@ -141,10 +245,20 @@ def make_assistant_args(server_args: argparse.Namespace, question: str) -> Simpl
         model=DEFAULT_MODEL,
         api_key=None,
         prometheus_url=server_args.prometheus_url,
+        repo_root=server_args.repo_root,
+        mlflow_url=server_args.mlflow_url,
+        airflow_url=server_args.airflow_url,
+        kafka_bootstrap=server_args.kafka_bootstrap,
+        minio_url=server_args.minio_url,
+        spark_master_url=server_args.spark_master_url,
+        docker_socket=server_args.docker_socket,
         simulation_jsonl=server_args.simulation_jsonl,
         max_events=3,
+        max_file_chars=1600,
+        max_context_files=25,
+        log_tail=40,
         temperature=0.2,
-        max_tokens=700,
+        max_tokens=1800,
     )
 
 
@@ -170,9 +284,21 @@ class ChatHandler(BaseHTTPRequestHandler):
             self.send_json(
                 {
                     "ok": True,
-                    "provider": "groq" if os.getenv("GROQ_API_KEY") else "local_fallback",
-                    "model": os.getenv("GROQ_MODEL", DEFAULT_MODEL),
-                    "groq_key_configured": bool(os.getenv("GROQ_API_KEY")),
+                    "provider": "gemini" if os.getenv("GEMINI_API_KEY") else "local_fallback",
+                    "model": os.getenv("GEMINI_MODEL", DEFAULT_MODEL),
+                    "gemini_key_configured": bool(os.getenv("GEMINI_API_KEY")),
+                    "scope": [
+                        "repo source/docs/notebooks",
+                        "MLflow REST",
+                        "Airflow REST",
+                        "Kafka topics/messages",
+                        "MinIO bucket/object samples",
+                        "Spark UI REST",
+                        "Grafana dashboard JSON",
+                        "Docker service log tails",
+                        "Prometheus metrics",
+                        "streaming replay JSONL",
+                    ],
                 }
             )
             return

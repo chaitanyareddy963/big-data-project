@@ -1,7 +1,7 @@
 # Original-Data Demonstration Track
 
 The original PR1 and PR2 notebook filenames are retained so the presentation
-order remains familiar. Their content now demonstrates the real datasets and
+order remains familiar. Their content now demonstrates the downloaded historical datasets and
 the corrected modeling path.
 
 ## Raw MinIO Layout

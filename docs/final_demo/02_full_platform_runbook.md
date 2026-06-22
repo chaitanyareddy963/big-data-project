@@ -33,7 +33,18 @@ docker compose exec jupyter bash -lc \
 ```
 
 Open MLflow at <http://localhost:5000> and show the registered
-`aviation-disruption-balanced-logistic` model.
+`aviation-disruption-balanced-logistic` model. Do not rebuild MLflow evidence
+inside Grafana; use the MLflow UI directly.
+
+Show:
+
+- registered model
+- AUC
+- positive precision
+- positive recall
+- confusion metrics
+- model artifact
+- staging/production alias
 
 ## Start API and Dashboards
 
@@ -63,7 +74,7 @@ curl -X POST http://localhost:3000/predict \
   }'
 ```
 
-Call the API with a real Gold-table row:
+Call the API with a historical Gold-table row from the downloaded lakehouse:
 
 ```bash
 docker compose exec jupyter bash -lc \
@@ -72,11 +83,11 @@ docker compose exec jupyter bash -lc \
 
 ## Dataset Streaming Replay
 
-This replay demonstrates that real Gold feature rows from the downloaded
-lakehouse can be streamed into the deployed prediction path. The script reads
-Gold feature rows, publishes each event to Kafka topic
-`simulation.prediction.requests`, calls the deployed API, and writes JSONL
-evidence.
+This replay demonstrates the dataset-only streaming simulation. The script
+reads historical Gold feature rows from the downloaded lakehouse, publishes
+each replay event to Kafka topic `simulation.prediction.requests` for streaming
+evidence, separately calls the deployed BentoML API for scoring, and writes
+JSONL evidence for review. The API does not consume from Kafka in this demo.
 
 ```bash
 docker compose exec jupyter bash -lc \
@@ -92,19 +103,38 @@ docker compose exec jupyter bash -lc \
 
 Open Kafka UI at <http://localhost:8085> and show topic
 `simulation.prediction.requests`. Open Grafana and show dashboard
-`Aviation Dataset Simulation Stream`.
+`Aviation Final Demo Dashboard`.
+
+On `Aviation Final Demo Dashboard`, show:
+
+- simulated records scored
+- stream rate
+- latest probability
+- risk-band split
+- API latency during simulation
+- all prediction sources
+- active dataset replay alerts
+- dataset replay alert states
+
+Prometheus also exposes the same replay alerts at <http://localhost:9090/alerts>.
+The alert rules are intentionally scoped to the simulated dataset replay, not
+the entire platform:
+
+- `AviationDatasetReplayInactive`
+- `AviationDatasetReplayHighLatency`
+- `AviationDatasetReplayAPIFailures`
+- `AviationHighRiskBandShare`
 
 ## LLM Operations Assistant
 
-The optional LLM layer uses Groq's OpenAI-compatible chat completions API with
-Llama 3.3 70B. It answers questions from the dataset replay evidence and
-Prometheus metrics.
+The optional LLM layer uses Google Gemini generateContent API with Gemini 3.5 Flash. It answers questions from the codebase/docs/notebooks, dataset
+replay evidence, Prometheus metrics, MLflow, Airflow, Kafka, MinIO, Spark, Grafana dashboard JSON, and bounded Docker service log tails.
 
 Configure `.env`:
 
 ```bash
-GROQ_API_KEY=your_key_here
-GROQ_MODEL=llama-3.3-70b-versatile
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 Run:
@@ -126,9 +156,16 @@ Open <http://localhost:7860> and ask:
 - `How does the dataset streaming replay work?`
 - `Which downloaded datasets are used by the model?`
 - `What should I show in Grafana for final presentation?`
+- `Which files implement the dataset replay and API scoring path?`
+- `What is the current status of MLflow, Kafka, MinIO, Spark, and Grafana?`
+- `Are there recent warnings or errors in the service logs?`
 
-If `GROQ_API_KEY` is missing, the assistant returns a local fallback summary
+If `GEMINI_API_KEY` is missing, the assistant returns a local fallback summary
 instead of failing.
+
+The assistant indexes source code, docs, notebooks, and dashboard JSON with
+bounded file excerpts. It excludes local secrets, raw datasets, generated
+lakehouse data, and model binaries. Runtime service state is queried directly from the corresponding service APIs when those services are reachable. Recent service logs are read from the local Docker socket for the project container allow-list and redacted before being sent to the assistant.
 
 ## 10x Stability Demonstration
 
@@ -136,18 +173,30 @@ instead of failing.
 python3 api/load_test.py --requests 100 --concurrency 10
 ```
 
-Open Grafana at <http://localhost:3001> and show:
+Open Grafana at <http://localhost:3001> and show dashboard
+`Aviation Final Demo Dashboard`:
 
-1. Total prediction requests and current requests per second.
-2. Failed API requests, if any.
-3. Prediction latency p50 and p95.
-4. Risk-band split across low and high predictions.
-5. Dataset streaming replay rate and simulated risk-band split.
+- total prediction requests
+- request rate
+- failed requests, if any
+- latency p50/p95
+- risk-band requests
+- probability trend
+- probability distribution
+- active dataset replay alerts
+- dataset replay alert states
 
-## Airflow
+## Service UIs
 
-Open Airflow at <http://localhost:8088>. Show the scheduled
-`aviation_original_data_lakehouse` DAG and its Spark, Delta, and MLflow tasks.
+Use these as service dashboards, not custom Grafana dashboards:
+
+| UI | URL | Show |
+|---|---|---|
+| Airflow | http://localhost:8088 | `aviation_original_data_lakehouse` DAG graph and run status |
+| Spark Master | http://localhost:8080 | Spark applications, jobs, and stages |
+| Spark Worker | http://localhost:8081 | worker resources and executor activity |
+| MLflow | http://localhost:5000 | model registry, metrics, artifacts, aliases |
+| Kafka UI | http://localhost:8085 | `simulation.prediction.requests` topic messages |
 
 ## Verification
 

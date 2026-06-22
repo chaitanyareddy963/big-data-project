@@ -1,7 +1,7 @@
 FROM python:3.13-slim
 
 WORKDIR /app
-RUN pip install --no-cache-dir bentoml==1.4.32 prometheus-client requests
+RUN pip install --no-cache-dir bentoml==1.4.32 prometheus-client requests boto3 kafka-python
 COPY api /app/api
 ENV PYTHONPATH=/app
 EXPOSE 3000

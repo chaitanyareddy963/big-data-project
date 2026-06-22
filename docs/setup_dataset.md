@@ -50,8 +50,8 @@ HOST_GID=<output of id -g>
 Optional Q&A assistant key:
 
 ```bash
-GROQ_API_KEY=your-groq-key
-GROQ_MODEL=llama-3.3-70b-versatile
+GEMINI_API_KEY=your-gemini-key
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
 Start MinIO and core services:

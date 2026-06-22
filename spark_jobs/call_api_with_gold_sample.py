@@ -1,4 +1,4 @@
-"""Call the prediction API with a real row from the Gold feature table."""
+"""Call the prediction API with a historical Gold row from the lakehouse."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     settings = load_settings()
-    spark = create_spark_session("call-api-with-real-gold-row", settings)
+    spark = create_spark_session("call-api-with-historical-gold-row", settings)
     key = f"gold/training_features/year={args.year}"
     if args.month:
         key = f"{key}/month={args.month:02d}"
@@ -41,7 +41,7 @@ def main() -> None:
         response = requests.post(args.api_url, json={"features": features}, timeout=15)
         response.raise_for_status()
         print("Gold source:", source)
-        print("Real data context:", json.dumps({k: str(record[k]) for k in ["flight_date", "origin", "destination", "label"]}))
+        print("Historical lakehouse context:", json.dumps({k: str(record[k]) for k in ["flight_date", "origin", "destination", "label"]}))
         print("Request features:", json.dumps(features, indent=2))
         print("API response:", json.dumps(response.json(), indent=2))
     finally:
@@ -50,4 +50,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

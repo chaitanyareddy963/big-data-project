@@ -1,0 +1,61 @@
+groups:
+  - name: aviation-dataset-streaming-simulation-alerts
+    rules:
+      - alert: AviationDatasetReplayInactive
+        expr: sum(increase(aviation_prediction_requests_by_source_total{source="dataset_simulation"}[10m])) == 0
+        for: 2m
+        labels:
+          severity: info
+          component: dataset-replay
+        annotations:
+          summary: "No dataset replay records scored recently"
+          description: "No dataset simulation predictions were scored in the last 10 minutes. This is expected when the final replay demo is idle."
+
+      - alert: AviationDatasetReplayHighLatency
+        expr: |
+          (
+            sum(increase(aviation_prediction_requests_by_source_total{source="dataset_simulation"}[5m])) > 0
+          )
+          and
+          (
+            histogram_quantile(0.95, sum(rate(aviation_prediction_latency_seconds_bucket[2m])) by (le)) > 1
+          )
+        for: 1m
+        labels:
+          severity: warning
+          component: dataset-replay
+        annotations:
+          summary: "Dataset replay scoring latency is high"
+          description: "During the dataset replay window, prediction API p95 latency has stayed above 1 second."
+
+      - alert: AviationDatasetReplayAPIFailures
+        expr: |
+          (
+            sum(increase(aviation_prediction_requests_by_source_total{source="dataset_simulation"}[5m])) > 0
+          )
+          and
+          (
+            sum(increase(bentoml_service_request_total{http_response_code!="200"}[5m])) > 0
+          )
+        for: 30s
+        labels:
+          severity: warning
+          component: dataset-replay
+        annotations:
+          summary: "Dataset replay saw prediction API failures"
+          description: "The replay has been active recently and the prediction API returned at least one non-200 response in the same 5-minute window."
+
+      - alert: AviationHighRiskBandShare
+        expr: |
+          (
+            sum(rate(aviation_prediction_requests_by_source_total{source="dataset_simulation",risk_band="high"}[5m]))
+            /
+            clamp_min(sum(rate(aviation_prediction_requests_by_source_total{source="dataset_simulation"}[5m])), 0.001)
+          ) > 0.7
+        for: 2m
+        labels:
+          severity: info
+          component: dataset-replay
+        annotations:
+          summary: "Dataset replay is producing mostly high-risk predictions"
+          description: "More than 70 percent of recent dataset replay predictions are in the high-risk band."
