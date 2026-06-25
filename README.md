@@ -23,6 +23,7 @@ validated. They are not the main final demo path.
 | Need | Go to |
 |---|---|
 | Fresh clone, dataset download, BTS download, MinIO upload, lakehouse build | [Dataset Setup](docs/setup_dataset.md) |
+| Customize or regenerate the ARCO-ERA5 Google Drive bundle | [ARCO ERA5 Colab Download Notebook](ARCO_ERA5_Dataset_Download_Script.ipynb) |
 | Notebook order for PR1, PR2, and final demo | [Notebook Demo Flow](notebooks/README.md) |
 | Final presentation commands and talking points | [Final Runbook](docs/final_demo/02_full_platform_runbook.md) |
 | Original-data scope and phase alignment | [Original-Data Demonstration Track](docs/final_demo/01_original_data_bronze.md) |
@@ -64,10 +65,17 @@ Approximate verified VM sizes:
 
 Detailed commands are in [docs/setup_dataset.md](docs/setup_dataset.md).
 
+The ARCO-ERA5 bundle was prepared with
+[ARCO_ERA5_Dataset_Download_Script.ipynb](ARCO_ERA5_Dataset_Download_Script.ipynb).
+Run this notebook in Google Colab when you want to regenerate the Drive dataset
+or customize the airport scope, year range, month range, or output layout. No
+API key is required for this ARCO-ERA5 download path; the notebook downloads
+public ARCO-ERA5 data and writes the prepared bundle to Google Drive.
+
 ## Quick Start
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/chaitanyareddy963/big-data-project.git
 cd big-data-project
 cp .env.example .env
 ```
@@ -189,3 +197,18 @@ secrets, raw datasets, generated lakehouse data, and model binaries.
 - The final verified large-data proof uses all 2024 months.
 - The final dataset-only simulation publishes historical Gold rows to Kafka for
   replay evidence and separately calls the API for scoring.
+
+## AI Assistance Declaration
+
+I used AI tools as coding and documentation assistants during development.
+
+AI assistance was used for:
+
+- generating and refining boilerplate code, documentation, and runbook text
+- debugging Docker, Spark, Airflow, Kafka, MinIO, MLflow, Grafana, and notebook issues
+- improving README structure, presentation flow, and final-demo explanations
+- reviewing code for consistency, missing documentation, and reproducibility gaps
+
+All final design decisions, dataset setup, execution, validation, screenshots,
+and presentation understanding are my responsibility. I reviewed, tested, and
+modified the generated suggestions before including them in the final project.

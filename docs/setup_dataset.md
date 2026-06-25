@@ -30,7 +30,7 @@ one-year proof plus raw/local/MinIO copies.
 ## 1. Clone And Configure
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/chaitanyareddy963/big-data-project.git
 cd big-data-project
 cp .env.example .env
 ```

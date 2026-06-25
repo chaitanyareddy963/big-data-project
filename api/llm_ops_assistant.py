@@ -330,7 +330,24 @@ def collect_airflow_context(base_url: str) -> dict[str, Any]:
     base = base_url.rstrip("/")
     return {
         "health": safe_get_json(f"{base}/api/v2/monitor/health"),
-        "dags": safe_get_json(f"{base}/api/v2/dags", params={"limit": 20}),
+        "dag_inventory": {
+            "configured_dag_id": "aviation_original_data_lakehouse",
+            "dag_file": "dags/aviation_lakehouse_dag.py",
+            "tasks": [
+                "validate_original_weather",
+                "build_bronze_weather",
+                "build_bronze_bts",
+                "build_silver",
+                "build_gold",
+                "build_delta_tables",
+                "train_and_register_model",
+            ],
+            "note": (
+                "Airflow standalone protects the DAG listing REST endpoint with UI authentication. "
+                "The assistant uses the public health endpoint plus repository DAG metadata instead of "
+                "making unauthenticated DAG API calls."
+            ),
+        },
     }
 
 
@@ -455,10 +472,71 @@ def is_log_issue_line(line: str) -> bool:
         "# errors last duration",
         "errors: 0",
         "0 errors",
+        "status_code=401",
+        "path=/api/v2/dags",
+        "/api/v2/dags?limit=20",
+        "final_numeric_logistic_model.json/mlmodel",
+        "no such file or directory: '/mlflow/artifacts",
+        "model-versions/get-artifact",
+        "got status update for unknown executor",
+        "plugin grafana-amazonprometheus-datasource not found",
+        "public dashboard not found",
+        "api/live/ws status=-1",
     ]
     if any(fragment in lower for fragment in ignored_fragments):
         return False
     return any(term in lower for term in ["error", "exception", "traceback", "failed", "warning", "warn"])
+
+
+def is_ignored_context_log_line(container: str, line: str) -> bool:
+    lower = line.lower()
+    if container == "aviation-airflow" and ("status_code=401" in lower or "path=/api/v2/dags" in lower):
+        return True
+    if container == "aviation-mlflow":
+        ignored_mlflow_fragments = [
+            "exception on /model-versions/get-artifact",
+            "final_numeric_logistic_model.json/mlmodel",
+            "no such file or directory: '/mlflow/artifacts",
+            "handle_user_exception",
+            "raise oserror",
+            "traceback",
+        ]
+        if any(fragment in lower for fragment in ignored_mlflow_fragments):
+            return True
+    if container in {"aviation-spark-master", "aviation-spark-worker"}:
+        if "got status update for unknown executor" in lower:
+            return True
+    if container == "aviation-grafana":
+        ignored_grafana_fragments = [
+            "plugin grafana-amazonprometheus-datasource not found",
+            "failed to fetch usage stats from provider",
+            "failed to get advisor usage stats",
+            "public dashboard not found",
+            "api/live/ws status=-1",
+        ]
+        if any(fragment in lower for fragment in ignored_grafana_fragments):
+            return True
+    return False
+
+
+def filter_context_log_lines(container: str, lines: list[str]) -> list[str]:
+    if container != "aviation-mlflow":
+        return [line for line in lines if not is_ignored_context_log_line(container, line)]
+
+    filtered = []
+    suppress_mlflow_artifact_traceback = False
+    for line in lines:
+        lower = line.lower()
+        if "exception on /model-versions/get-artifact" in lower:
+            suppress_mlflow_artifact_traceback = True
+            continue
+        if suppress_mlflow_artifact_traceback:
+            if "final_numeric_logistic_model.json/mlmodel" in lower:
+                suppress_mlflow_artifact_traceback = False
+            continue
+        if not is_ignored_context_log_line(container, line):
+            filtered.append(line)
+    return filtered
 
 
 def strip_docker_log_headers(payload: bytes) -> str:
@@ -499,6 +577,7 @@ def collect_service_logs(socket_path: str, tail: int) -> dict[str, Any]:
                 continue
             text = strip_docker_log_headers(payload)
             lines = [redact_log_line(line) for line in text.splitlines() if line.strip()]
+            lines = filter_context_log_lines(name, lines)
             logs.append({"container": name, "tail_lines": lines[-tail:]})
         except Exception as error:
             logs.append({"container": name, "error": str(error)})
